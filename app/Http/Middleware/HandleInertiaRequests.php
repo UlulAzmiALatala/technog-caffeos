@@ -29,10 +29,18 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
+        $user = $request->user()?->load('cafe.template');
+
         return [
             ...parent::share($request),
             'auth' => [
-                'user' => $request->user(),
+                'user' => $user,
+                'cafe' => $user?->cafe,
+                'activeTemplate' => $user?->cafe?->template?->slug ?? 'cyber-dark',
+            ],
+            'flash' => [
+                'success' => fn() => $request->session()->get('success'),
+                'ai_token' => fn() => $request->session()->get('ai_token'),
             ],
         ];
     }
