@@ -21,18 +21,20 @@ import {
 } from "lucide-react";
 
 export default function ManagementDashboard({
-    menus,
-    stocks,
-    tables,
-    templates,
+    menus = [],
+    stocks = [],
+    tables = [],
+    templates = [],
     staffs = [],
     vouchers = [],
     customers = [],
-    orders,
+    orders = [],
 }) {
     const { auth } = usePage().props;
+    const userRole = auth.user?.role || "cashier";
     const isWood = auth.activeTemplate === "minimalist-wood";
     const isBrutal = auth.activeTemplate === "neo-brutal";
+
     const [activeTab, setActiveTab] = useState("orders");
     const [selectedQrTable, setSelectedQrTable] = useState(null);
 
@@ -132,6 +134,7 @@ export default function ManagementDashboard({
     });
     const [imagePreview, setImagePreview] = useState(null);
 
+    // State Form Input Stok Bahan Baku Baru
     const [stockForm, setStockForm] = useState({
         name: "",
         type: "raw_material",
@@ -140,11 +143,13 @@ export default function ManagementDashboard({
         min_qty_alert: 100,
     });
 
+    // State Form Input Meja Baru
     const [tableForm, setTableForm] = useState({
         table_number: "",
         location: "Indoor",
     });
 
+    // State Form Input Staf Baru
     const [staffForm, setStaffForm] = useState({
         name: "",
         email: "",
@@ -153,6 +158,7 @@ export default function ManagementDashboard({
         password: "",
     });
 
+    // State Form Input Voucher Promo Baru
     const [voucherForm, setVoucherForm] = useState({
         code: "",
         name: "",
@@ -162,6 +168,7 @@ export default function ManagementDashboard({
         quota: 50,
     });
 
+    // State Penugasan Driver Delivery per Order
     const [driverData, setDriverData] = useState({});
 
     const cardClass = isBrutal
@@ -286,51 +293,61 @@ export default function ManagementDashboard({
         router.post(route("management.orders.driver", orderId), data);
     };
 
+    // Daftar 7 Tab Operasional yang Difilter Sesuai Role User
+    const availableTabs = [
+        {
+            id: "orders",
+            label: `1. DAPUR ORDER (${orders.length})`,
+            icon: ClipboardList,
+            roles: ["owner", "barista", "cashier"],
+        },
+        {
+            id: "menus",
+            label: `2. MENU & FOTO (${menus.length})`,
+            icon: Coffee,
+            roles: ["owner", "barista"],
+        },
+        {
+            id: "stocks",
+            label: `3. STOK GUDANG (${stocks.length})`,
+            icon: Package,
+            roles: ["owner", "barista"],
+        },
+        {
+            id: "vouchers",
+            label: `4. PROMO VOUCHER (${vouchers.length})`,
+            icon: Ticket,
+            roles: ["owner", "cashier"],
+        },
+        {
+            id: "customers",
+            label: `5. MEMBER CRM (${customers.length})`,
+            icon: HeartHandshake,
+            roles: ["owner", "cashier"],
+        },
+        {
+            id: "tables",
+            label: `6. MEJA & QR (${tables.length})`,
+            icon: QrCode,
+            roles: ["owner", "cashier"],
+        },
+        {
+            id: "staffs",
+            label: `7. KARYAWAN (${staffs.length})`,
+            icon: Users,
+            roles: ["owner"],
+        },
+    ].filter((tab) => tab.roles.includes(userRole));
+
     return (
         <CaffeOSLayout templates={templates} tables={tables}>
             <Head title="Operasional Dapur, Menu & Promo - TechnoG CaffeOS" />
 
             <div className="max-w-7xl mx-auto p-6 space-y-6">
-                {/* Bar Atas: Navigasi 7 Tab + Kontrol Suara Notifikasi Dapur */}
+                {/* Bar Atas: Navigasi Tab Sesuai Role + Kontrol Suara Notifikasi Dapur */}
                 <div className="flex flex-wrap justify-between items-center gap-3 border-b border-current/10 pb-4">
                     <div className="flex flex-wrap gap-2">
-                        {[
-                            {
-                                id: "orders",
-                                label: `1. DAPUR ORDER (${orders.length})`,
-                                icon: ClipboardList,
-                            },
-                            {
-                                id: "menus",
-                                label: `2. MENU & FOTO (${menus.length})`,
-                                icon: Coffee,
-                            },
-                            {
-                                id: "stocks",
-                                label: `3. STOK GUDANG (${stocks.length})`,
-                                icon: Package,
-                            },
-                            {
-                                id: "vouchers",
-                                label: `4. PROMO VOUCHER (${vouchers.length})`,
-                                icon: Ticket,
-                            },
-                            {
-                                id: "customers",
-                                label: `5. MEMBER CRM (${customers.length})`,
-                                icon: HeartHandshake,
-                            },
-                            {
-                                id: "tables",
-                                label: `6. MEJA & QR (${tables.length})`,
-                                icon: QrCode,
-                            },
-                            {
-                                id: "staffs",
-                                label: `7. KARYAWAN (${staffs.length})`,
-                                icon: Users,
-                            },
-                        ].map((tab) => {
+                        {availableTabs.map((tab) => {
                             const Icon = tab.icon;
                             const isActive = activeTab === tab.id;
                             return (
@@ -609,7 +626,6 @@ export default function ManagementDashboard({
                                 + Input Menu Kafe & Upload Foto Produk
                             </h2>
 
-                            {/* Input File Upload Foto Menu */}
                             <div>
                                 <label className="text-xs opacity-70 block mb-1">
                                     Foto Menu (JPG / PNG / WebP)
@@ -1387,7 +1403,7 @@ export default function ManagementDashboard({
                 )}
 
                 {/* ================= TAB 7: KELOLA AKUN KARYAWAN ================= */}
-                {activeTab === "staffs" && (
+                {activeTab === "staffs" && userRole === "owner" && (
                     <div className="grid grid-cols-12 gap-6">
                         <form
                             onSubmit={handleStaffSubmit}

@@ -13,6 +13,9 @@ import {
     WalletCards,
     Bell,
     Globe,
+    Truck,
+    CalendarClock,
+    UserCheck,
 } from "lucide-react";
 
 export default function CaffeOSLayout({
@@ -24,6 +27,7 @@ export default function CaffeOSLayout({
     const userRole = auth.user?.role || "cashier";
     const activeSlug = auth.activeTemplate || "cyber-dark";
 
+    // Daftar Menu Navigasi yang Disesuaikan Ketat per Role
     const navItems = [
         {
             name: "Super Admin SaaS (HQ)",
@@ -44,21 +48,35 @@ export default function CaffeOSLayout({
             href: route("pos.index"),
             active: route().current("pos.index"),
             icon: Monitor,
+            roles: ["owner", "cashier"], // Khusus Owner & Cashier
+        },
+        {
+            name: "Denah Meja & Reservasi",
+            href: route("reservations.index"),
+            active: route().current("reservations.*"),
+            icon: CalendarClock,
             roles: ["owner", "cashier", "barista"],
         },
         {
-            name: "Dapur, Menu & Promo",
+            name: "Dapur, Menu & Operasional",
             href: route("management.index"),
             active: route().current("management.*"),
             icon: ChefHat,
             roles: ["owner", "barista", "cashier"],
         },
         {
+            name: "Gudang, PO & Opname",
+            href: route("inventory.index"),
+            active: route().current("inventory.*"),
+            icon: Truck,
+            roles: ["owner", "barista"], // Khusus Owner & Barista
+        },
+        {
             name: "Keuangan & Riwayat Struk",
             href: route("finance.index"),
             active: route().current("finance.*"),
             icon: WalletCards,
-            roles: ["owner", "cashier"],
+            roles: ["owner", "cashier"], // Khusus Owner & Cashier
         },
         {
             name: "Layar TV Antrean",
@@ -71,6 +89,10 @@ export default function CaffeOSLayout({
 
     const handleSwitchTemplate = (templateId) => {
         router.post(route("pos.switch-template"), { template_id: templateId });
+    };
+
+    const handleQuickRoleSwitch = (role) => {
+        router.post(route("saas.quick-demo"), { role });
     };
 
     const handleLogout = () => {
@@ -142,7 +164,7 @@ export default function CaffeOSLayout({
             <aside
                 className={`w-64 flex flex-col justify-between shrink-0 sticky top-0 h-screen z-30 ${currentStyle.sidebar}`}
             >
-                <div className="p-5 space-y-6 overflow-y-auto">
+                <div className="p-5 space-y-5 overflow-y-auto">
                     <div className={`p-4 rounded-2xl ${currentStyle.brandBox}`}>
                         <div className="flex items-center gap-2 font-extrabold text-base">
                             <Sparkles className="w-5 h-5 shrink-0" />
@@ -162,9 +184,9 @@ export default function CaffeOSLayout({
                         </div>
                     </div>
 
-                    <nav className="space-y-2">
+                    <nav className="space-y-1.5">
                         <p className="px-3 text-[10px] font-extrabold uppercase tracking-wider opacity-60">
-                            Menu Navigasi ({userRole})
+                            Hak Akses Role: {userRole.toUpperCase()}
                         </p>
                         {navItems.map((item) => {
                             const Icon = item.icon;
@@ -208,7 +230,31 @@ export default function CaffeOSLayout({
                     )}
                 </div>
 
-                <div className="p-4 border-t border-current/10">
+                {/* Bagian Bawah Sidebar: 1-Click Role Tester & Tombol Logout */}
+                <div className="p-4 border-t border-current/10 space-y-3">
+                    <div className="space-y-1.5">
+                        <span className="text-[10px] font-extrabold uppercase opacity-60 flex items-center gap-1">
+                            <UserCheck className="w-3.5 h-3.5" /> Uji Pindah
+                            Role Instan:
+                        </span>
+                        <div className="grid grid-cols-3 gap-1 text-[10px] font-extrabold">
+                            {["owner", "cashier", "barista"].map((r) => (
+                                <button
+                                    key={r}
+                                    type="button"
+                                    onClick={() => handleQuickRoleSwitch(r)}
+                                    className={`py-1.5 rounded-lg uppercase transition ${
+                                        userRole === r
+                                            ? "bg-emerald-500 text-slate-950 shadow"
+                                            : "bg-black/20 hover:bg-black/30 opacity-75"
+                                    }`}
+                                >
+                                    {r}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
                     <button
                         onClick={handleLogout}
                         className={`w-full py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition ${currentStyle.logoutBtn}`}
@@ -227,7 +273,9 @@ export default function CaffeOSLayout({
                             🎨 Tema Aktif: {activeSlug.toUpperCase()}
                         </span>
                         <span className="hidden md:inline-block text-xs opacity-75 font-medium">
-                            Sidebar + Header Terpadu • Satu Mesin Fitur Seragam
+                            Role Aktif:{" "}
+                            <strong>{userRole.toUpperCase()}</strong> (
+                            {navItems.length} Modul Terbuka)
                         </span>
                     </div>
 

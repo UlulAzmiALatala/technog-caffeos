@@ -2,10 +2,12 @@
 
 use App\Http\Controllers\CustomerOrderController;
 use App\Http\Controllers\FinanceController;
+use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\ManagementController;
 use App\Http\Controllers\OwnerController;
 use App\Http\Controllers\PosController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ReservationController;
 use App\Http\Controllers\SuperAdminController;
 use App\Http\Controllers\TenantOnboardingController;
 use Illuminate\Http\Request;
@@ -31,57 +33,73 @@ Route::get('/dashboard', function (Request $request) {
     };
 })->middleware(['auth', 'verified'])->name('dashboard');
 
-// 4. Grup Route Eksklusif OWNER & SUPER ADMIN TECHNOG HQ
+// 4. GRUP KHUSUS OWNER (Super Admin HQ, Monitoring Bisnis, Export, Settings, & Tambah Karyawan)
 Route::middleware(['auth', 'role:owner'])->group(function () {
-    // Super Admin SaaS Control Center
     Route::get('/super-admin', [SuperAdminController::class, 'index'])->name('superadmin.dashboard');
     Route::post('/super-admin/cafes/{cafe}/toggle', [SuperAdminController::class, 'toggleCafeStatus'])->name('superadmin.cafes.toggle');
     Route::post('/super-admin/cafes/{cafe}/template', [SuperAdminController::class, 'updateCafeTemplate'])->name('superadmin.cafes.template');
     Route::post('/super-admin/cafes/{cafe}/impersonate', [SuperAdminController::class, 'impersonateCafe'])->name('superadmin.cafes.impersonate');
     Route::post('/super-admin/templates', [SuperAdminController::class, 'storeTemplate'])->name('superadmin.templates.store');
 
-    // Owner Cafe Dashboard
     Route::get('/owner', [OwnerController::class, 'index'])->name('owner.dashboard');
     Route::post('/owner/ai-chat', [OwnerController::class, 'askOwnerAi'])->name('owner.ask-ai');
     Route::post('/owner/settings', [OwnerController::class, 'updateCafeSettings'])->name('owner.settings.update');
     Route::get('/owner/export-csv', [OwnerController::class, 'exportCsv'])->name('owner.export');
+
+    // Hanya Owner yang boleh membuat akun Karyawan baru (Cashier/Barista/Owner)
+    Route::post('/management/staffs', [ManagementController::class, 'storeStaff'])->name('management.staffs.store');
 });
 
-// 5. Grup Route Operasional POS, TV Antrean, Keuangan, Shift Kasir & Manajemen Dapur
-Route::middleware(['auth', 'role:owner,cashier,barista'])->group(function () {
+// 5. GRUP KHUSUS OWNER & CASHIER (Kasir POS, Shift Laci, Keuangan, Void Order, & Promo Voucher)
+Route::middleware(['auth', 'role:owner,cashier'])->group(function () {
     Route::get('/pos', [PosController::class, 'index'])->name('pos.index');
-    Route::get('/queue-board', [PosController::class, 'queueBoard'])->name('pos.queue-board');
     Route::post('/pos/checkout', [PosController::class, 'checkout'])->name('pos.checkout');
-    Route::post('/pos/switch-template', [PosController::class, 'switchTemplate'])->name('pos.switch-template');
     Route::post('/pos/orders/{order}/approve-cash', [PosController::class, 'approveCashOrder'])->name('pos.approve-cash');
 
-    // Route Buka & Tutup Shift Kasir (Petty Cash)
     Route::post('/pos/shift/open', [PosController::class, 'openShift'])->name('pos.shift.open');
     Route::post('/pos/shift/close', [PosController::class, 'closeShift'])->name('pos.shift.close');
 
-    // Route Manajemen Keuangan, Kas Keluar (Expenses), & Void Order
     Route::get('/finance', [FinanceController::class, 'index'])->name('finance.index');
     Route::post('/finance/expenses', [FinanceController::class, 'storeExpense'])->name('finance.expenses.store');
     Route::delete('/finance/expenses/{expense}', [FinanceController::class, 'destroyExpense'])->name('finance.expenses.destroy');
     Route::post('/finance/orders/{order}/void', [FinanceController::class, 'voidOrder'])->name('finance.orders.void');
 
-    // Route Manajemen Operasional, Upload Foto Menu, Voucher Promo, & Member CRM
-    Route::get('/management', [ManagementController::class, 'index'])->name('management.index');
-    Route::post('/management/stocks', [ManagementController::class, 'storeStock'])->name('management.stocks.store');
-    Route::post('/management/stocks/{stock}/restock', [ManagementController::class, 'restock'])->name('management.stocks.restock');
-    Route::post('/management/menus', [ManagementController::class, 'storeMenu'])->name('management.menus.store');
-    Route::post('/management/menus/{menu}/toggle', [ManagementController::class, 'toggleMenuAvailability'])->name('management.menus.toggle');
-    Route::delete('/management/menus/{menu}', [ManagementController::class, 'destroyMenu'])->name('management.menus.destroy');
-    Route::post('/management/tables', [ManagementController::class, 'storeTable'])->name('management.tables.store');
-    Route::post('/management/orders/{order}/status', [ManagementController::class, 'updateOrderStatus'])->name('management.orders.status');
-    Route::post('/management/orders/{order}/driver', [ManagementController::class, 'assignDriver'])->name('management.orders.driver');
-    Route::post('/management/staffs', [ManagementController::class, 'storeStaff'])->name('management.staffs.store');
     Route::post('/management/vouchers', [ManagementController::class, 'storeVoucher'])->name('management.vouchers.store');
     Route::post('/management/vouchers/{voucher}/toggle', [ManagementController::class, 'toggleVoucher'])->name('management.vouchers.toggle');
     Route::delete('/management/vouchers/{voucher}', [ManagementController::class, 'destroyVoucher'])->name('management.vouchers.destroy');
 });
 
-// 6. Grup Route Profile Bawaan Laravel Breeze
+// 6. GRUP KHUSUS OWNER & BARISTA (Gudang Supply Chain, PO Supplier, Stock Opname, & Input Resep Menu)
+Route::middleware(['auth', 'role:owner,barista'])->group(function () {
+    Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory.index');
+    Route::post('/inventory/suppliers', [InventoryController::class, 'storeSupplier'])->name('inventory.suppliers.store');
+    Route::delete('/inventory/suppliers/{supplier}', [InventoryController::class, 'destroySupplier'])->name('inventory.suppliers.destroy');
+    Route::post('/inventory/logs', [InventoryController::class, 'storeStockLog'])->name('inventory.logs.store');
+
+    Route::post('/management/stocks', [ManagementController::class, 'storeStock'])->name('management.stocks.store');
+    Route::post('/management/stocks/{stock}/restock', [ManagementController::class, 'restock'])->name('management.stocks.restock');
+    Route::post('/management/menus', [ManagementController::class, 'storeMenu'])->name('management.menus.store');
+    Route::delete('/management/menus/{menu}', [ManagementController::class, 'destroyMenu'])->name('management.menus.destroy');
+});
+
+// 7. GRUP BERSAMA: OWNER, CASHIER, & BARISTA (Dapur Order, TV Antrean, Denah Meja, & Ganti Tema Demo)
+Route::middleware(['auth', 'role:owner,cashier,barista'])->group(function () {
+    Route::get('/queue-board', [PosController::class, 'queueBoard'])->name('pos.queue-board');
+    Route::post('/pos/switch-template', [PosController::class, 'switchTemplate'])->name('pos.switch-template');
+
+    Route::get('/reservations', [ReservationController::class, 'index'])->name('reservations.index');
+    Route::post('/reservations', [ReservationController::class, 'storeReservation'])->name('reservations.store');
+    Route::post('/reservations/{reservation}/status', [ReservationController::class, 'updateReservationStatus'])->name('reservations.status');
+    Route::post('/reservations/tables/{table}/status', [ReservationController::class, 'updateTableStatus'])->name('reservations.tables.status');
+
+    Route::get('/management', [ManagementController::class, 'index'])->name('management.index');
+    Route::post('/management/menus/{menu}/toggle', [ManagementController::class, 'toggleMenuAvailability'])->name('management.menus.toggle');
+    Route::post('/management/tables', [ManagementController::class, 'storeTable'])->name('management.tables.store');
+    Route::post('/management/orders/{order}/status', [ManagementController::class, 'updateOrderStatus'])->name('management.orders.status');
+    Route::post('/management/orders/{order}/driver', [ManagementController::class, 'assignDriver'])->name('management.orders.driver');
+});
+
+// 8. Grup Route Profile Bawaan Laravel Breeze
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
