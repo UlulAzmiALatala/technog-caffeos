@@ -10,6 +10,9 @@ import {
     Palette,
     ShieldCheck,
     Tv,
+    WalletCards,
+    Bell,
+    Globe,
 } from "lucide-react";
 
 export default function CaffeOSLayout({
@@ -19,9 +22,16 @@ export default function CaffeOSLayout({
 }) {
     const { auth, flash } = usePage().props;
     const userRole = auth.user?.role || "cashier";
-    const isWoodTemplate = auth.activeTemplate === "minimalist-wood";
+    const activeSlug = auth.activeTemplate || "cyber-dark";
 
     const navItems = [
+        {
+            name: "Super Admin SaaS (HQ)",
+            href: route("superadmin.dashboard"),
+            active: route().current("superadmin.*"),
+            icon: Globe,
+            roles: ["owner"],
+        },
         {
             name: "Owner Monitoring & AI",
             href: route("owner.dashboard"),
@@ -32,7 +42,7 @@ export default function CaffeOSLayout({
         {
             name: "Kasir POS & Call Queue",
             href: route("pos.index"),
-            active: route().current("pos.*"),
+            active: route().current("pos.index"),
             icon: Monitor,
             roles: ["owner", "cashier", "barista"],
         },
@@ -42,6 +52,20 @@ export default function CaffeOSLayout({
             active: route().current("management.*"),
             icon: ChefHat,
             roles: ["owner", "barista", "cashier"],
+        },
+        {
+            name: "Keuangan & Riwayat Struk",
+            href: route("finance.index"),
+            active: route().current("finance.*"),
+            icon: WalletCards,
+            roles: ["owner", "cashier"],
+        },
+        {
+            name: "Layar TV Antrean",
+            href: route("pos.queue-board"),
+            active: route().current("pos.queue-board"),
+            icon: Tv,
+            roles: ["owner", "cashier", "barista"],
         },
     ].filter((item) => item.roles.includes(userRole));
 
@@ -53,135 +77,94 @@ export default function CaffeOSLayout({
         router.post(route("logout"));
     };
 
-    // LAYOUT A: TOP HEADER (Minimalist Warm Wood)
-    if (isWoodTemplate) {
-        return (
-            <div className="min-h-screen bg-amber-50/70 text-stone-800 flex flex-col">
-                <header className="bg-amber-950 text-amber-50 shadow-md sticky top-0 z-30">
-                    <div className="max-w-7xl mx-auto px-6 py-3.5 flex flex-wrap justify-between items-center gap-4">
-                        <div className="flex items-center gap-6">
-                            <div>
-                                <span className="text-lg font-serif font-bold text-amber-300 tracking-wide">
-                                    ☕ {auth.cafe?.name}
-                                </span>
-                                <span className="ml-2.5 px-2 py-0.5 text-[11px] rounded bg-amber-800 text-amber-200 uppercase font-bold">
-                                    {userRole}
-                                </span>
-                            </div>
+    const themeStyles = {
+        "cyber-dark": {
+            wrapper: "bg-slate-950 text-slate-100",
+            sidebar:
+                "bg-slate-900/95 backdrop-blur-xl border-r border-slate-800 text-slate-100",
+            header: "bg-slate-900/90 backdrop-blur-xl border-b border-slate-800 text-slate-100",
+            brandBox:
+                "bg-slate-950 border border-emerald-500/30 text-emerald-400",
+            roleBadge:
+                "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30",
+            navActive:
+                "bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20 font-extrabold",
+            navInactive: "text-slate-300 hover:bg-slate-800/80",
+            qrChip: "bg-slate-950 border border-slate-800 text-emerald-300 hover:border-emerald-500/50",
+            tplActive: "bg-emerald-500 text-slate-950 font-extrabold",
+            tplInactive:
+                "bg-slate-950 text-slate-400 hover:bg-slate-800 border border-slate-800",
+            logoutBtn:
+                "bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-300",
+        },
+        "minimalist-wood": {
+            wrapper: "bg-amber-50/70 text-stone-800",
+            sidebar:
+                "bg-amber-950 text-amber-50 border-r border-amber-900 shadow-xl",
+            header: "bg-white border-b border-amber-200 text-stone-800 shadow-sm",
+            brandBox:
+                "bg-amber-900/80 border border-amber-700 text-amber-300 font-serif",
+            roleBadge: "bg-amber-400 text-amber-950",
+            navActive: "bg-amber-400 text-amber-950 shadow-md font-extrabold",
+            navInactive: "text-amber-100/80 hover:bg-amber-900",
+            qrChip: "bg-amber-50 border border-amber-300 text-amber-900 hover:bg-amber-200",
+            tplActive: "bg-amber-900 text-amber-100 font-bold",
+            tplInactive:
+                "bg-amber-50 text-stone-600 hover:bg-amber-100 border border-amber-200",
+            logoutBtn:
+                "bg-red-900/70 hover:bg-red-800 text-amber-100 border border-red-700",
+        },
+        "neo-brutal": {
+            wrapper: "bg-yellow-300 text-black",
+            sidebar: "bg-white text-black border-r-4 border-black",
+            header: "bg-cyan-300 text-black border-b-4 border-black",
+            brandBox:
+                "bg-pink-400 border-2 border-black text-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]",
+            roleBadge: "bg-yellow-300 border-2 border-black text-black",
+            navActive:
+                "bg-lime-400 text-black border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] font-black",
+            navInactive:
+                "text-black hover:bg-yellow-200 font-bold border-2 border-transparent",
+            qrChip: "bg-white border-2 border-black text-black font-bold shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:bg-lime-300",
+            tplActive:
+                "bg-pink-400 text-black border-2 border-black font-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]",
+            tplInactive:
+                "bg-white text-black border-2 border-black font-bold hover:bg-yellow-100",
+            logoutBtn:
+                "bg-red-400 hover:bg-red-300 text-black border-2 border-black font-black shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]",
+        },
+    };
 
-                            <nav className="flex items-center gap-2">
-                                {navItems.map((item) => {
-                                    const Icon = item.icon;
-                                    return (
-                                        <Link
-                                            key={item.name}
-                                            href={item.href}
-                                            className={`px-3.5 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition ${
-                                                item.active
-                                                    ? "bg-amber-400 text-amber-950 shadow-sm"
-                                                    : "text-amber-100 hover:bg-amber-900"
-                                            }`}
-                                        >
-                                            <Icon className="w-4 h-4" />{" "}
-                                            {item.name}
-                                        </Link>
-                                    );
-                                })}
+    const currentStyle = themeStyles[activeSlug] || themeStyles["cyber-dark"];
 
-                                <a
-                                    href={route("pos.queue-board")}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="px-3 py-2 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-1.5"
-                                >
-                                    <Tv className="w-4 h-4" /> TV Antrean ↗
-                                </a>
-                            </nav>
-                        </div>
-
-                        <div className="flex items-center gap-3 text-xs">
-                            {templates.length > 0 && (
-                                <div className="flex items-center gap-1 bg-amber-900/80 p-1 rounded-lg border border-amber-800">
-                                    <Palette className="w-3.5 h-3.5 text-amber-300 ml-1.5 mr-1" />
-                                    {templates.map((tpl) => (
-                                        <button
-                                            key={tpl.id}
-                                            onClick={() =>
-                                                handleSwitchTemplate(tpl.id)
-                                            }
-                                            className={`px-2.5 py-1 rounded font-semibold transition ${
-                                                auth.activeTemplate === tpl.slug
-                                                    ? "bg-amber-300 text-amber-950"
-                                                    : "text-amber-200 hover:bg-amber-800"
-                                            }`}
-                                        >
-                                            {tpl.name}
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-
-                            <button
-                                onClick={handleLogout}
-                                className="px-3 py-1.5 rounded-lg bg-red-800/80 hover:bg-red-700 text-white font-semibold flex items-center gap-1"
-                            >
-                                <LogOut className="w-3.5 h-3.5" /> Keluar
-                            </button>
-                        </div>
-                    </div>
-
-                    <div className="bg-amber-900/90 px-6 py-1.5 text-xs flex justify-between items-center border-t border-amber-800/60">
-                        <div className="flex items-center gap-2">
-                            <span className="text-amber-200">
-                                📱 Buka Link QR Pelanggan:
-                            </span>
-                            {tables.map((t) => (
-                                <a
-                                    key={t.id}
-                                    href={route("customer.scan", t.qr_code)}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="px-2 py-0.5 rounded bg-amber-950 text-amber-300 hover:bg-amber-400 hover:text-amber-950 font-mono transition"
-                                >
-                                    Meja {t.table_number} ↗
-                                </a>
-                            ))}
-                        </div>
-                        {flash?.success && (
-                            <span className="text-emerald-300 font-semibold">
-                                ✨ {flash.success}{" "}
-                                {flash.ai_token &&
-                                    `| Token AI: ${flash.ai_token}`}
-                            </span>
-                        )}
-                    </div>
-                </header>
-
-                <main className="flex-1">{children}</main>
-            </div>
-        );
-    }
-
-    // LAYOUT B: LEFT SIDEBAR (CyberDark & Neo-Brutalist)
     return (
-        <div className="min-h-screen bg-slate-950 text-slate-100 flex">
-            <aside className="w-64 bg-slate-900/90 backdrop-blur-xl border-r border-slate-800 flex flex-col justify-between shrink-0 sticky top-0 h-screen">
-                <div className="p-5 space-y-5 overflow-y-auto">
-                    <div className="p-3.5 rounded-2xl bg-slate-950 border border-emerald-500/20">
-                        <div className="flex items-center gap-2 text-emerald-400 font-bold text-base">
-                            <Sparkles className="w-5 h-5" /> {auth.cafe?.name}
+        <div className={`min-h-screen flex ${currentStyle.wrapper}`}>
+            <aside
+                className={`w-64 flex flex-col justify-between shrink-0 sticky top-0 h-screen z-30 ${currentStyle.sidebar}`}
+            >
+                <div className="p-5 space-y-6 overflow-y-auto">
+                    <div className={`p-4 rounded-2xl ${currentStyle.brandBox}`}>
+                        <div className="flex items-center gap-2 font-extrabold text-base">
+                            <Sparkles className="w-5 h-5 shrink-0" />
+                            <span className="truncate">
+                                {auth.cafe?.name || "TechnoG CaffeOS"}
+                            </span>
                         </div>
-                        <div className="mt-2 flex items-center justify-between text-xs text-slate-400">
-                            <span>{auth.user?.name}</span>
-                            <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 uppercase font-bold text-[10px]">
+                        <div className="mt-2.5 flex items-center justify-between text-xs">
+                            <span className="truncate opacity-85 font-medium">
+                                {auth.user?.name}
+                            </span>
+                            <span
+                                className={`px-2 py-0.5 rounded-md uppercase font-extrabold text-[10px] ${currentStyle.roleBadge}`}
+                            >
                                 {userRole}
                             </span>
                         </div>
                     </div>
 
-                    <div className="space-y-1.5">
-                        <p className="px-3 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                            Menu Operasional ({userRole})
+                    <nav className="space-y-2">
+                        <p className="px-3 text-[10px] font-extrabold uppercase tracking-wider opacity-60">
+                            Menu Navigasi ({userRole})
                         </p>
                         {navItems.map((item) => {
                             const Icon = item.icon;
@@ -189,41 +172,33 @@ export default function CaffeOSLayout({
                                 <Link
                                     key={item.name}
                                     href={item.href}
-                                    className={`w-full px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-3 transition ${
+                                    className={`w-full px-3.5 py-2.5 rounded-xl text-xs flex items-center gap-3 transition ${
                                         item.active
-                                            ? "bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20"
-                                            : "text-slate-300 hover:bg-slate-800/80"
+                                            ? currentStyle.navActive
+                                            : currentStyle.navInactive
                                     }`}
                                 >
-                                    <Icon className="w-4 h-4" /> {item.name}
+                                    <Icon className="w-4 h-4 shrink-0" />
+                                    <span>{item.name}</span>
                                 </Link>
                             );
                         })}
-
-                        <a
-                            href={route("pos.queue-board")}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="w-full px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-3 bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/25 transition mt-2"
-                        >
-                            <Tv className="w-4 h-4" /> Layar TV Antrean ↗
-                        </a>
-                    </div>
+                    </nav>
 
                     {tables.length > 0 && (
-                        <div className="space-y-2 pt-2 border-t border-slate-800">
-                            <p className="px-3 text-[10px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
-                                <QrCode className="w-3 h-3" /> Simulasi QR
+                        <div className="space-y-2 pt-3 border-t border-current/10">
+                            <p className="px-3 text-[10px] font-extrabold uppercase tracking-wider opacity-60 flex items-center gap-1">
+                                <QrCode className="w-3.5 h-3.5" /> Simulasi QR
                                 Pelanggan
                             </p>
-                            <div className="grid grid-cols-2 gap-1.5 px-2">
+                            <div className="grid grid-cols-2 gap-1.5 px-1">
                                 {tables.map((t) => (
                                     <a
                                         key={t.id}
                                         href={route("customer.scan", t.qr_code)}
                                         target="_blank"
                                         rel="noreferrer"
-                                        className="px-2.5 py-1.5 rounded-lg bg-slate-950 hover:bg-emerald-500/20 border border-slate-800 hover:border-emerald-500/40 text-emerald-300 text-[11px] font-mono text-center transition"
+                                        className={`px-2 py-1.5 rounded-lg text-[11px] font-mono text-center transition ${currentStyle.qrChip}`}
                                     >
                                         Meja {t.table_number} ↗
                                     </a>
@@ -233,57 +208,72 @@ export default function CaffeOSLayout({
                     )}
                 </div>
 
-                <div className="p-4 border-t border-slate-800 space-y-3 bg-slate-950/50">
-                    {templates.length > 0 && (
-                        <div className="space-y-1.5">
-                            <span className="text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1">
-                                <Palette className="w-3.5 h-3.5 text-emerald-400" />{" "}
-                                Tema Layout Aktif
-                            </span>
-                            <div className="grid grid-cols-1 gap-1.5">
+                <div className="p-4 border-t border-current/10">
+                    <button
+                        onClick={handleLogout}
+                        className={`w-full py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition ${currentStyle.logoutBtn}`}
+                    >
+                        <LogOut className="w-4 h-4" /> Keluar ({userRole})
+                    </button>
+                </div>
+            </aside>
+
+            <div className="flex-1 flex flex-col min-w-0">
+                <header
+                    className={`sticky top-0 z-20 px-6 py-3 flex flex-wrap justify-between items-center gap-4 ${currentStyle.header}`}
+                >
+                    <div className="flex items-center gap-3">
+                        <span className="text-xs font-extrabold uppercase tracking-wider px-3 py-1 rounded-lg bg-black/10">
+                            🎨 Tema Aktif: {activeSlug.toUpperCase()}
+                        </span>
+                        <span className="hidden md:inline-block text-xs opacity-75 font-medium">
+                            Sidebar + Header Terpadu • Satu Mesin Fitur Seragam
+                        </span>
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-wrap text-xs">
+                        {templates.length > 0 && (
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-bold flex items-center gap-1 mr-1 opacity-80">
+                                    <Palette className="w-4 h-4" /> Ganti
+                                    Template UI:
+                                </span>
                                 {templates.map((tpl) => (
                                     <button
                                         key={tpl.id}
                                         onClick={() =>
                                             handleSwitchTemplate(tpl.id)
                                         }
-                                        className={`w-full px-3 py-1.5 rounded-lg text-xs font-bold text-left transition flex justify-between items-center ${
-                                            auth.activeTemplate === tpl.slug
-                                                ? "bg-emerald-500/20 border border-emerald-500 text-emerald-300"
-                                                : "bg-slate-900 text-slate-400 hover:bg-slate-800"
+                                        className={`px-3 py-1.5 rounded-lg text-xs transition flex items-center gap-1 ${
+                                            activeSlug === tpl.slug
+                                                ? currentStyle.tplActive
+                                                : currentStyle.tplInactive
                                         }`}
                                     >
                                         <span>{tpl.name}</span>
-                                        {auth.activeTemplate === tpl.slug && (
+                                        {activeSlug === tpl.slug && (
                                             <ShieldCheck className="w-3.5 h-3.5" />
                                         )}
                                     </button>
                                 ))}
                             </div>
-                        </div>
-                    )}
+                        )}
+                    </div>
+                </header>
 
-                    <button
-                        onClick={handleLogout}
-                        className="w-full py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-300 text-xs font-bold flex items-center justify-center gap-2 transition"
-                    >
-                        <LogOut className="w-4 h-4" /> Logout ({auth.user?.role}
-                        )
-                    </button>
-                </div>
-            </aside>
-
-            <div className="flex-1 flex flex-col min-w-0">
                 {flash?.success && (
-                    <div className="bg-emerald-500/10 border-b border-emerald-500/30 text-emerald-300 px-6 py-2.5 text-xs font-semibold flex justify-between items-center">
-                        <span>✨ {flash.success}</span>
+                    <div className="bg-emerald-600 text-white px-6 py-2.5 text-xs font-bold flex flex-wrap justify-between items-center gap-2 shadow">
+                        <span className="flex items-center gap-2">
+                            <Bell className="w-4 h-4" /> {flash.success}
+                        </span>
                         {flash.ai_token && (
-                            <span className="px-2.5 py-0.5 rounded bg-purple-500/20 border border-purple-500/40 text-purple-200 font-mono">
-                                Token AI Baru: {flash.ai_token}
+                            <span className="px-3 py-0.5 rounded-full bg-slate-950 text-purple-300 font-mono">
+                                Token AI Terbit: {flash.ai_token}
                             </span>
                         )}
                     </div>
                 )}
+
                 <main className="flex-1 overflow-y-auto">{children}</main>
             </div>
         </div>

@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Models\Voucher;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
 class ManagementController extends Controller
@@ -41,7 +42,7 @@ class ManagementController extends Controller
         ]);
     }
 
-    // 1. INPUT & RESTOCK BAHAN BAKU (MONITOR STOCK)
+    // 1. INPUT & RESTOCK BAHAN BAKU
     public function storeStock(Request $request)
     {
         $validated = $request->validate([
@@ -68,7 +69,7 @@ class ManagementController extends Controller
         return back()->with('success', "Stok {$stock->name} berhasil ditambah!");
     }
 
-    // 2. INPUT MENU BARU + KOMPOSISI RESEP STOK (INPUT MENU)
+    // 2. INPUT MENU BARU + UPLOAD FOTO ASLI + KOMPOSISI RESEP STOK
     public function storeMenu(Request $request)
     {
         $validated = $request->validate([
@@ -78,10 +79,17 @@ class ManagementController extends Controller
             'discount' => 'nullable|numeric|min:0',
             'description' => 'nullable|string',
             'treatment' => 'nullable|string',
+            'image_file' => 'nullable|image|max:4096', // Maksimal 4MB
             'recipes' => 'nullable|array',
             'recipes.*.stock_id' => 'required|exists:stocks,id',
             'recipes.*.qty_needed' => 'required|numeric|min:0.1',
         ]);
+
+        $imagePath = null;
+        if ($request->hasFile('image_file')) {
+            $stored = $request->file('image_file')->store('menus', 'public');
+            $imagePath = '/storage/' . $stored;
+        }
 
         $menu = Menu::create([
             'cafe_id' => $request->user()->cafe_id,
@@ -91,6 +99,7 @@ class ManagementController extends Controller
             'discount' => $validated['discount'] ?? 0,
             'description' => $validated['description'] ?? '',
             'treatment' => $validated['treatment'] ?? '',
+            'image' => $imagePath,
             'is_available' => true,
         ]);
 
@@ -102,7 +111,7 @@ class ManagementController extends Controller
             $menu->stocks()->sync($syncData);
         }
 
-        return back()->with('success', "Menu {$menu->name} beserta resepnya berhasil ditambahkan!");
+        return back()->with('success', "Menu {$menu->name} beserta foto & resepnya berhasil ditambahkan!");
     }
 
     public function toggleMenuAvailability(Menu $menu)
@@ -113,6 +122,9 @@ class ManagementController extends Controller
 
     public function destroyMenu(Menu $menu)
     {
+        if ($menu->image && str_starts_with($menu->image, '/storage/')) {
+            Storage::disk('public')->delete(str_replace('/storage/', '', $menu->image));
+        }
         $menu->delete();
         return back()->with('success', 'Menu berhasil dihapus.');
     }
@@ -169,7 +181,7 @@ class ManagementController extends Controller
         return back()->with('success', "Driver {$validated['driver_name']} berhasil ditugaskan untuk Antrean #{$order->queue_number}!");
     }
 
-    // 5. KELOLA AKUN KARYAWAN (BARISTA & CASHIER)
+    // 5. KELOLA AKUN KARYAWAN
     public function storeStaff(Request $request)
     {
         $validated = $request->validate([
@@ -193,7 +205,7 @@ class ManagementController extends Controller
         return back()->with('success', "Akun {$validated['role']} ({$validated['name']}) berhasil ditambahkan!");
     }
 
-    // 6. KELOLA VOUCHER PROMO & DISKON
+    // 6. KELOLA VOUCHER PROMO
     public function storeVoucher(Request $request)
     {
         $validated = $request->validate([

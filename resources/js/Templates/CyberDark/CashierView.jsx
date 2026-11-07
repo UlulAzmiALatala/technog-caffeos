@@ -38,7 +38,6 @@ export default function CyberDarkCashier({
 
     return (
         <div className="min-h-screen bg-slate-950 text-slate-100 p-6 grid grid-cols-12 gap-6">
-            {/* Katalog Menu & Antrean Aktif */}
             <div className="col-span-12 lg:col-span-8 space-y-6">
                 <div className="p-5 rounded-2xl bg-slate-900/70 backdrop-blur-xl border border-emerald-500/20 flex justify-between items-center">
                     <div>
@@ -55,7 +54,7 @@ export default function CyberDarkCashier({
                     </span>
                 </div>
 
-                {/* Grid Menu */}
+                {/* Grid Menu dengan Dukungan Foto Produk */}
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                     {menus.map((menu) => (
                         <div
@@ -64,9 +63,17 @@ export default function CyberDarkCashier({
                             className="cursor-pointer group p-4 rounded-2xl bg-slate-900/60 hover:bg-slate-800/80 backdrop-blur-md border border-slate-800 hover:border-emerald-500/50 transition-all flex flex-col justify-between"
                         >
                             <div>
-                                <div className="h-28 rounded-xl bg-gradient-to-br from-emerald-950 to-slate-900 flex items-center justify-center mb-3">
-                                    <Coffee className="w-10 h-10 text-emerald-400 group-hover:scale-110 transition-transform" />
-                                </div>
+                                {menu.image ? (
+                                    <img
+                                        src={menu.image}
+                                        alt={menu.name}
+                                        className="h-32 w-full object-cover rounded-xl mb-3 group-hover:scale-[1.02] transition-transform"
+                                    />
+                                ) : (
+                                    <div className="h-32 rounded-xl bg-gradient-to-br from-emerald-950 to-slate-900 flex items-center justify-center mb-3">
+                                        <Coffee className="w-10 h-10 text-emerald-400 group-hover:scale-110 transition-transform" />
+                                    </div>
+                                )}
                                 <h3 className="font-semibold text-base">
                                     {menu.name}
                                 </h3>
@@ -87,7 +94,6 @@ export default function CyberDarkCashier({
                     ))}
                 </div>
 
-                {/* Panel Call Queue, Cetak Struk, & Riwayat Order + AI Token */}
                 <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800">
                     <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-3">
                         Antrean Pesanan, Struk Thermal & AI Token Terbit
@@ -143,7 +149,6 @@ export default function CyberDarkCashier({
                 </div>
             </div>
 
-            {/* Panel Keranjang & Checkout */}
             <div className="col-span-12 lg:col-span-4 p-6 rounded-2xl bg-slate-900/80 backdrop-blur-xl border border-slate-800 flex flex-col justify-between h-fit space-y-4">
                 <div className="space-y-3">
                     <h2 className="text-lg font-bold border-b border-slate-800 pb-3">
@@ -191,7 +196,6 @@ export default function CyberDarkCashier({
                         </select>
                     </div>
 
-                    {/* List Item di Keranjang */}
                     <div className="space-y-2 max-h-60 overflow-y-auto pr-1 pt-1">
                         {cart.map((item) => (
                             <div
@@ -201,6 +205,11 @@ export default function CyberDarkCashier({
                                 <div>
                                     <p className="text-sm font-medium">
                                         {item.name}
+                                        {item.notes && (
+                                            <span className="ml-1 text-xs text-amber-400">
+                                                ({item.notes})
+                                            </span>
+                                        )}
                                     </p>
                                     <p className="text-xs text-emerald-400">
                                         Rp{" "}

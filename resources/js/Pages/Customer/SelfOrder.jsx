@@ -9,6 +9,7 @@ import {
     Minus,
     CreditCard,
     Banknote,
+    Coffee,
 } from "lucide-react";
 
 export default function SelfOrder({ cafe, table, menus, activeTemplate }) {
@@ -47,7 +48,6 @@ export default function SelfOrder({ cafe, table, menus, activeTemplate }) {
         >
             <Head title={`Order Meja ${table.table_number} - ${cafe.name}`} />
 
-            {/* Header Pelanggan Adaptif Sesuai Template */}
             <div
                 className={`p-5 sticky top-0 z-10 flex justify-between items-center border-b ${
                     isWood
@@ -74,36 +74,49 @@ export default function SelfOrder({ cafe, table, menus, activeTemplate }) {
             </div>
 
             <div className="max-w-4xl mx-auto p-5 grid md:grid-cols-12 gap-6">
-                {/* Katalog Menu */}
                 <div className="md:col-span-7 space-y-3">
                     <h2
                         className={`font-bold ${isWood ? "font-serif text-lg text-amber-950" : "text-slate-300"}`}
                     >
-                        Daftar Menu Kafe (
-                        {isWood ? "Warm Wood Theme" : "CyberDark Theme"})
+                        Daftar Menu Kafe
                     </h2>
                     {menus.map((menu) => (
                         <div
                             key={menu.id}
-                            className={`p-4 rounded-2xl border flex justify-between items-center ${
+                            className={`p-4 rounded-2xl border flex justify-between items-center gap-4 ${
                                 isWood
                                     ? "bg-white border-amber-200 shadow-sm"
                                     : "bg-slate-900 border-slate-800"
                             }`}
                         >
-                            <div className="pr-4">
-                                <h3 className="font-bold text-base">
-                                    {menu.name}
-                                </h3>
-                                <p className="text-xs opacity-70 mt-1">
-                                    {menu.description}
-                                </p>
-                                <p
-                                    className={`font-bold text-sm mt-2 ${isWood ? "text-amber-800" : "text-emerald-400"}`}
-                                >
-                                    Rp{" "}
-                                    {Number(menu.price).toLocaleString("id-ID")}
-                                </p>
+                            <div className="flex items-center gap-3.5">
+                                {menu.image ? (
+                                    <img
+                                        src={menu.image}
+                                        alt={menu.name}
+                                        className="w-16 h-16 rounded-xl object-cover shrink-0 border border-emerald-500/30"
+                                    />
+                                ) : (
+                                    <div className="w-16 h-16 rounded-xl bg-emerald-500/10 flex items-center justify-center shrink-0">
+                                        <Coffee className="w-7 h-7 text-emerald-400" />
+                                    </div>
+                                )}
+                                <div>
+                                    <h3 className="font-bold text-base">
+                                        {menu.name}
+                                    </h3>
+                                    <p className="text-xs opacity-70 mt-1">
+                                        {menu.description}
+                                    </p>
+                                    <p
+                                        className={`font-bold text-sm mt-1.5 ${isWood ? "text-amber-800" : "text-emerald-400"}`}
+                                    >
+                                        Rp{" "}
+                                        {Number(menu.price).toLocaleString(
+                                            "id-ID",
+                                        )}
+                                    </p>
+                                </div>
                             </div>
                             <button
                                 onClick={() => addToCart(menu)}
@@ -119,7 +132,6 @@ export default function SelfOrder({ cafe, table, menus, activeTemplate }) {
                     ))}
                 </div>
 
-                {/* Keranjang Checkout Pelanggan */}
                 <div
                     className={`md:col-span-5 p-5 rounded-2xl border space-y-4 h-fit ${
                         isWood

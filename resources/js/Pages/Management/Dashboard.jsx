@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Head, router, usePage } from "@inertiajs/react";
 import CaffeOSLayout from "@/Layouts/CaffeOSLayout";
 import {
@@ -15,6 +15,9 @@ import {
     Printer,
     Ticket,
     HeartHandshake,
+    Volume2,
+    VolumeX,
+    ImagePlus,
 } from "lucide-react";
 
 export default function ManagementDashboard({
@@ -29,10 +32,94 @@ export default function ManagementDashboard({
 }) {
     const { auth } = usePage().props;
     const isWood = auth.activeTemplate === "minimalist-wood";
+    const isBrutal = auth.activeTemplate === "neo-brutal";
     const [activeTab, setActiveTab] = useState("orders");
     const [selectedQrTable, setSelectedQrTable] = useState(null);
 
-    // State Form Input Menu Baru
+    // State Fitur Suara Notifikasi Pesanan Baru Otomatis di Dapur Barista
+    const [soundAlertEnabled, setSoundAlertEnabled] = useState(true);
+    const knownOrderIdsRef = useRef(new Set(orders.map((o) => o.id)));
+
+    // Fungsi Membunyikan Lonceng Dapur (Web Audio Synthesizer) + Suara Barista
+    const playKitchenBellAndVoice = (queueNumber, customerName, orderType) => {
+        try {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (AudioCtx) {
+                const ctx = new AudioCtx();
+                // Nada 1 (Ding)
+                const osc1 = ctx.createOscillator();
+                const gain1 = ctx.createGain();
+                osc1.type = "sine";
+                osc1.frequency.setValueAtTime(880, ctx.currentTime);
+                gain1.gain.setValueAtTime(0.25, ctx.currentTime);
+                gain1.gain.exponentialRampToValueAtTime(
+                    0.001,
+                    ctx.currentTime + 0.4,
+                );
+                osc1.connect(gain1);
+                gain1.connect(ctx.destination);
+                osc1.start();
+                osc1.stop(ctx.currentTime + 0.4);
+
+                // Nada 2 (Dong)
+                const osc2 = ctx.createOscillator();
+                const gain2 = ctx.createGain();
+                osc2.type = "sine";
+                osc2.frequency.setValueAtTime(1174.66, ctx.currentTime + 0.25);
+                gain2.gain.setValueAtTime(0.3, ctx.currentTime + 0.25);
+                gain2.gain.exponentialRampToValueAtTime(
+                    0.001,
+                    ctx.currentTime + 0.9,
+                );
+                osc2.connect(gain2);
+                gain2.connect(ctx.destination);
+                osc2.start(ctx.currentTime + 0.25);
+                osc2.stop(ctx.currentTime + 0.9);
+            }
+        } catch (e) {
+            // Abaikan jika browser memblokir autoplay sebelum interaksi
+        }
+
+        if ("speechSynthesis" in window) {
+            setTimeout(() => {
+                const msg = new SpeechSynthesisUtterance(
+                    `Perhatian Barista, pesanan baru masuk! Antrean nomor ${queueNumber}, atas nama ${customerName}, tipe ${orderType}.`,
+                );
+                msg.lang = "id-ID";
+                msg.rate = 0.98;
+                window.speechSynthesis.speak(msg);
+            }, 600);
+        }
+    };
+
+    // Auto-Polling Dapur Setiap 5 Detik untuk Mendeteksi Pesanan Baru dari QR Meja / Kasir
+    useEffect(() => {
+        const interval = setInterval(() => {
+            router.reload({
+                only: ["orders"],
+                preserveScroll: true,
+                onSuccess: (page) => {
+                    const latestOrders = page.props.orders || [];
+                    latestOrders.forEach((ord) => {
+                        if (!knownOrderIdsRef.current.has(ord.id)) {
+                            knownOrderIdsRef.current.add(ord.id);
+                            if (soundAlertEnabled) {
+                                playKitchenBellAndVoice(
+                                    ord.queue_number,
+                                    ord.customer_name,
+                                    ord.order_type,
+                                );
+                            }
+                        }
+                    });
+                },
+            });
+        }, 5000);
+
+        return () => clearInterval(interval);
+    }, [soundAlertEnabled]);
+
+    // State Form Input Menu Baru + Upload File Foto
     const [menuForm, setMenuForm] = useState({
         name: "",
         category: "Coffee",
@@ -40,10 +127,11 @@ export default function ManagementDashboard({
         discount: 0,
         description: "",
         treatment: "",
+        image_file: null,
         recipes: [],
     });
+    const [imagePreview, setImagePreview] = useState(null);
 
-    // State Form Input Stok Bahan Baku Baru
     const [stockForm, setStockForm] = useState({
         name: "",
         type: "raw_material",
@@ -52,13 +140,11 @@ export default function ManagementDashboard({
         min_qty_alert: 100,
     });
 
-    // State Form Input Meja Baru
     const [tableForm, setTableForm] = useState({
         table_number: "",
         location: "Indoor",
     });
 
-    // State Form Input Staf Baru
     const [staffForm, setStaffForm] = useState({
         name: "",
         email: "",
@@ -67,7 +153,6 @@ export default function ManagementDashboard({
         password: "",
     });
 
-    // State Form Input Voucher Promo Baru
     const [voucherForm, setVoucherForm] = useState({
         code: "",
         name: "",
@@ -77,16 +162,29 @@ export default function ManagementDashboard({
         quota: 50,
     });
 
-    // State Penugasan Driver Delivery per Order
     const [driverData, setDriverData] = useState({});
 
-    const cardClass = isWood
-        ? "bg-white border border-amber-200 text-stone-800 shadow-sm"
-        : "bg-slate-900 border border-slate-800 text-slate-100";
+    const cardClass = isBrutal
+        ? "bg-white border-4 border-black text-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]"
+        : isWood
+          ? "bg-white border border-amber-200 text-stone-800 shadow-sm"
+          : "bg-slate-900 border border-slate-800 text-slate-100";
 
-    const inputClass = isWood
-        ? "rounded-xl bg-amber-50/50 border-stone-300 text-stone-800 text-sm"
-        : "rounded-xl bg-slate-950 border-slate-800 text-white text-sm";
+    const inputClass = isBrutal
+        ? "rounded-xl bg-yellow-100 border-2 border-black text-black font-bold text-xs"
+        : isWood
+          ? "rounded-xl bg-amber-50/50 border-stone-300 text-stone-800 text-sm"
+          : "rounded-xl bg-slate-950 border-slate-800 text-white text-sm";
+
+    const handleImageChange = (e) => {
+        const file = e.target.files[0];
+        setMenuForm({ ...menuForm, image_file: file || null });
+        if (file) {
+            setImagePreview(URL.createObjectURL(file));
+        } else {
+            setImagePreview(null);
+        }
+    };
 
     const addRecipeRow = () => {
         setMenuForm({
@@ -114,7 +212,8 @@ export default function ManagementDashboard({
     const handleMenuSubmit = (e) => {
         e.preventDefault();
         router.post(route("management.menus.store"), menuForm, {
-            onSuccess: () =>
+            forceFormData: true,
+            onSuccess: () => {
                 setMenuForm({
                     name: "",
                     category: "Coffee",
@@ -122,8 +221,11 @@ export default function ManagementDashboard({
                     discount: 0,
                     description: "",
                     treatment: "",
+                    image_file: null,
                     recipes: [],
-                }),
+                });
+                setImagePreview(null);
+            },
         });
     };
 
@@ -189,65 +291,107 @@ export default function ManagementDashboard({
             <Head title="Operasional Dapur, Menu & Promo - TechnoG CaffeOS" />
 
             <div className="max-w-7xl mx-auto p-6 space-y-6">
-                {/* Bar Navigasi 7 Sub-Fitur Operasional & Manajemen */}
-                <div className="flex flex-wrap gap-2 border-b border-slate-700/30 pb-4">
-                    {[
-                        {
-                            id: "orders",
-                            label: `1. DAPUR ORDER (${orders.length})`,
-                            icon: ClipboardList,
-                        },
-                        {
-                            id: "menus",
-                            label: `2. MENU & RESEP (${menus.length})`,
-                            icon: Coffee,
-                        },
-                        {
-                            id: "stocks",
-                            label: `3. STOK GUDANG (${stocks.length})`,
-                            icon: Package,
-                        },
-                        {
-                            id: "vouchers",
-                            label: `4. PROMO VOUCHER (${vouchers.length})`,
-                            icon: Ticket,
-                        },
-                        {
-                            id: "customers",
-                            label: `5. MEMBER CRM (${customers.length})`,
-                            icon: HeartHandshake,
-                        },
-                        {
-                            id: "tables",
-                            label: `6. MEJA & QR (${tables.length})`,
-                            icon: QrCode,
-                        },
-                        {
-                            id: "staffs",
-                            label: `7. KARYAWAN (${staffs.length})`,
-                            icon: Users,
-                        },
-                    ].map((tab) => {
-                        const Icon = tab.icon;
-                        const isActive = activeTab === tab.id;
-                        return (
-                            <button
-                                key={tab.id}
-                                onClick={() => setActiveTab(tab.id)}
-                                className={`px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition ${
-                                    isActive
-                                        ? isWood
-                                            ? "bg-amber-900 text-white shadow"
-                                            : "bg-emerald-500 text-slate-950 shadow"
-                                        : isWood
-                                          ? "bg-white text-stone-700 border border-amber-200 hover:bg-amber-100"
-                                          : "bg-slate-900 text-slate-300 hover:bg-slate-800"
-                                }`}
-                            >
-                                <Icon className="w-4 h-4" /> {tab.label}
-                            </button>
-                        );
-                    })}
+                {/* Bar Atas: Navigasi 7 Tab + Kontrol Suara Notifikasi Dapur */}
+                <div className="flex flex-wrap justify-between items-center gap-3 border-b border-current/10 pb-4">
+                    <div className="flex flex-wrap gap-2">
+                        {[
+                            {
+                                id: "orders",
+                                label: `1. DAPUR ORDER (${orders.length})`,
+                                icon: ClipboardList,
+                            },
+                            {
+                                id: "menus",
+                                label: `2. MENU & FOTO (${menus.length})`,
+                                icon: Coffee,
+                            },
+                            {
+                                id: "stocks",
+                                label: `3. STOK GUDANG (${stocks.length})`,
+                                icon: Package,
+                            },
+                            {
+                                id: "vouchers",
+                                label: `4. PROMO VOUCHER (${vouchers.length})`,
+                                icon: Ticket,
+                            },
+                            {
+                                id: "customers",
+                                label: `5. MEMBER CRM (${customers.length})`,
+                                icon: HeartHandshake,
+                            },
+                            {
+                                id: "tables",
+                                label: `6. MEJA & QR (${tables.length})`,
+                                icon: QrCode,
+                            },
+                            {
+                                id: "staffs",
+                                label: `7. KARYAWAN (${staffs.length})`,
+                                icon: Users,
+                            },
+                        ].map((tab) => {
+                            const Icon = tab.icon;
+                            const isActive = activeTab === tab.id;
+                            return (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => setActiveTab(tab.id)}
+                                    className={`px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition ${
+                                        isActive
+                                            ? isWood
+                                                ? "bg-amber-900 text-white shadow"
+                                                : "bg-emerald-500 text-slate-950 shadow"
+                                            : isWood
+                                              ? "bg-white text-stone-700 border border-amber-200 hover:bg-amber-100"
+                                              : "bg-slate-900 text-slate-300 hover:bg-slate-800"
+                                    }`}
+                                >
+                                    <Icon className="w-4 h-4" /> {tab.label}
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    {/* Tombol Pengaktif & Tes Alarm Suara Pesanan Baru Dapur */}
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() =>
+                                playKitchenBellAndVoice(
+                                    orders[0]?.queue_number || 1,
+                                    orders[0]?.customer_name || "Pelanggan",
+                                    "dine_in",
+                                )
+                            }
+                            className="px-3 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold"
+                        >
+                            🔊 Tes Bunyi Alarm Dapur
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() =>
+                                setSoundAlertEnabled(!soundAlertEnabled)
+                            }
+                            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 ${
+                                soundAlertEnabled
+                                    ? "bg-emerald-500/20 border border-emerald-500/40 text-emerald-400"
+                                    : "bg-red-500/20 border border-red-500/40 text-red-400"
+                            }`}
+                        >
+                            {soundAlertEnabled ? (
+                                <>
+                                    <Volume2 className="w-4 h-4" /> Auto-Suara
+                                    Dapur: ON
+                                </>
+                            ) : (
+                                <>
+                                    <VolumeX className="w-4 h-4" /> Auto-Suara
+                                    Dapur: OFF
+                                </>
+                            )}
+                        </button>
+                    </div>
                 </div>
 
                 {/* ================= TAB 1: MANAGE ORDER DAPUR & DELIVERY ================= */}
@@ -259,7 +403,7 @@ export default function ManagementDashboard({
                                 className={`p-5 rounded-2xl flex flex-col justify-between space-y-4 ${cardClass}`}
                             >
                                 <div>
-                                    <div className="flex justify-between items-center border-b border-slate-700/20 pb-2">
+                                    <div className="flex justify-between items-center border-b border-current/10 pb-2">
                                         <span className="text-lg font-extrabold text-emerald-500">
                                             Antrean #{ord.queue_number}
                                         </span>
@@ -277,7 +421,7 @@ export default function ManagementDashboard({
                                     </p>
 
                                     <ul
-                                        className={`mt-3 space-y-1.5 text-xs p-3 rounded-xl ${isWood ? "bg-amber-50" : "bg-slate-950"}`}
+                                        className={`mt-3 space-y-1.5 text-xs p-3 rounded-xl ${isWood ? "bg-amber-50" : "bg-slate-950 text-white"}`}
                                     >
                                         {ord.items?.map((it) => (
                                             <li
@@ -286,6 +430,11 @@ export default function ManagementDashboard({
                                             >
                                                 <span className="font-bold">
                                                     {it.qty}x {it.menu?.name}
+                                                    {it.notes && (
+                                                        <span className="ml-1 text-emerald-400">
+                                                            ({it.notes})
+                                                        </span>
+                                                    )}
                                                 </span>
                                                 {it.menu?.treatment && (
                                                     <span className="text-[11px] opacity-70">
@@ -449,20 +598,48 @@ export default function ManagementDashboard({
                     </div>
                 )}
 
-                {/* ================= TAB 2: INPUT MENU & RESEP ================= */}
+                {/* ================= TAB 2: INPUT MENU, UPLOAD FOTO & RESEP ================= */}
                 {activeTab === "menus" && (
                     <div className="grid grid-cols-12 gap-6">
                         <form
                             onSubmit={handleMenuSubmit}
                             className={`col-span-12 lg:col-span-5 p-6 rounded-2xl space-y-4 h-fit ${cardClass}`}
                         >
-                            <h2 className="font-bold text-base text-emerald-500 border-b border-slate-700/20 pb-2">
-                                + Input Menu Kafe Baru
+                            <h2 className="font-bold text-base text-emerald-500 border-b border-current/10 pb-2">
+                                + Input Menu Kafe & Upload Foto Produk
                             </h2>
+
+                            {/* Input File Upload Foto Menu */}
+                            <div>
+                                <label className="text-xs opacity-70 block mb-1">
+                                    Foto Menu (JPG / PNG / WebP)
+                                </label>
+                                <label className="cursor-pointer flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-dashed border-emerald-500/40 hover:border-emerald-500 bg-emerald-500/5 text-xs font-bold text-emerald-400 transition">
+                                    <ImagePlus className="w-5 h-5" />
+                                    <span>
+                                        {menuForm.image_file
+                                            ? menuForm.image_file.name
+                                            : "Pilih Foto Menu dari Laptop/HP"}
+                                    </span>
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={handleImageChange}
+                                        className="hidden"
+                                    />
+                                </label>
+                                {imagePreview && (
+                                    <img
+                                        src={imagePreview}
+                                        alt="Preview Menu"
+                                        className="mt-2 h-32 w-full object-cover rounded-xl border border-emerald-500/30"
+                                    />
+                                )}
+                            </div>
 
                             <div>
                                 <label className="text-xs opacity-70">
-                                    Nama Menu
+                                    Nama Menu *
                                 </label>
                                 <input
                                     type="text"
@@ -506,7 +683,7 @@ export default function ManagementDashboard({
                                 </div>
                                 <div>
                                     <label className="text-xs opacity-70">
-                                        Harga Jual (Rp)
+                                        Harga Jual (Rp) *
                                     </label>
                                     <input
                                         type="number"
@@ -626,7 +803,7 @@ export default function ManagementDashboard({
                                 type="submit"
                                 className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm"
                             >
-                                Simpan Menu & Resep
+                                Simpan Menu, Foto & Resep
                             </button>
                         </form>
 
@@ -634,31 +811,44 @@ export default function ManagementDashboard({
                             {menus.map((m) => (
                                 <div
                                     key={m.id}
-                                    className={`p-4 rounded-2xl flex justify-between items-center ${cardClass}`}
+                                    className={`p-4 rounded-2xl flex justify-between items-center gap-4 ${cardClass}`}
                                 >
-                                    <div className="space-y-1">
-                                        <div className="flex items-center gap-2">
-                                            <span className="font-bold text-base">
-                                                {m.name}
-                                            </span>
-                                            <span className="text-xs px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-semibold">
-                                                {m.category}
-                                            </span>
-                                        </div>
-                                        <p className="text-xs opacity-70">
-                                            {m.description}
-                                        </p>
-                                        <div className="flex flex-wrap gap-1.5 pt-1">
-                                            {m.stocks?.map((st) => (
-                                                <span
-                                                    key={st.id}
-                                                    className="text-[11px] px-2 py-0.5 rounded bg-slate-500/10 font-mono"
-                                                >
-                                                    {st.name}:{" "}
-                                                    {st.pivot.qty_needed}{" "}
-                                                    {st.unit}
+                                    <div className="flex items-center gap-4">
+                                        {m.image ? (
+                                            <img
+                                                src={m.image}
+                                                alt={m.name}
+                                                className="w-16 h-16 rounded-xl object-cover border border-emerald-500/30 shrink-0"
+                                            />
+                                        ) : (
+                                            <div className="w-16 h-16 rounded-xl bg-emerald-500/10 flex items-center justify-center shrink-0">
+                                                <Coffee className="w-7 h-7 text-emerald-400" />
+                                            </div>
+                                        )}
+                                        <div className="space-y-1">
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-bold text-base">
+                                                    {m.name}
                                                 </span>
-                                            ))}
+                                                <span className="text-xs px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-semibold">
+                                                    {m.category}
+                                                </span>
+                                            </div>
+                                            <p className="text-xs opacity-70">
+                                                {m.description}
+                                            </p>
+                                            <div className="flex flex-wrap gap-1.5 pt-1">
+                                                {m.stocks?.map((st) => (
+                                                    <span
+                                                        key={st.id}
+                                                        className="text-[11px] px-2 py-0.5 rounded bg-slate-500/10 font-mono"
+                                                    >
+                                                        {st.name}:{" "}
+                                                        {st.pivot.qty_needed}{" "}
+                                                        {st.unit}
+                                                    </span>
+                                                ))}
+                                            </div>
                                         </div>
                                     </div>
 
@@ -841,7 +1031,7 @@ export default function ManagementDashboard({
                             onSubmit={handleVoucherSubmit}
                             className={`col-span-12 lg:col-span-4 p-6 rounded-2xl space-y-4 h-fit ${cardClass}`}
                         >
-                            <h2 className="font-bold text-base text-emerald-500 border-b border-slate-700/20 pb-2">
+                            <h2 className="font-bold text-base text-emerald-500 border-b border-current/10 pb-2">
                                 + Buat Kode Voucher Promo
                             </h2>
                             <div>
@@ -972,12 +1162,6 @@ export default function ManagementDashboard({
                         </form>
 
                         <div className="col-span-12 lg:col-span-8 grid grid-cols-1 md:grid-cols-2 gap-4 h-fit">
-                            {vouchers.length === 0 && (
-                                <p className="col-span-2 text-center py-12 text-xs opacity-60">
-                                    Belum ada voucher promo. Buat voucher di
-                                    sebelah kiri agar muncul di layar Kasir POS!
-                                </p>
-                            )}
                             {vouchers.map((v) => (
                                 <div
                                     key={v.id}
@@ -1045,22 +1229,12 @@ export default function ManagementDashboard({
                 {/* ================= TAB 5: MEMBER PELANGGAN (CRM) ================= */}
                 {activeTab === "customers" && (
                     <div className={`p-6 rounded-2xl ${cardClass}`}>
-                        <div className="flex justify-between items-center mb-4">
-                            <div>
-                                <h2 className="font-bold text-lg text-emerald-500">
-                                    Database Member & Loyalitas Pelanggan (CRM)
-                                </h2>
-                                <p className="text-xs opacity-70">
-                                    Otomatis tercatat setiap kali kasir
-                                    menginput Nomor WhatsApp pelanggan saat
-                                    checkout.
-                                </p>
-                            </div>
-                        </div>
-
+                        <h2 className="font-bold text-lg text-emerald-500 mb-4">
+                            Database Member & Loyalitas Pelanggan (CRM)
+                        </h2>
                         <div className="overflow-x-auto">
                             <table className="w-full text-xs text-left">
-                                <thead className="uppercase opacity-60 border-b border-slate-700/30">
+                                <thead className="uppercase opacity-60 border-b border-current/10">
                                     <tr>
                                         <th className="py-3">Kode Member</th>
                                         <th className="py-3">Nama Pelanggan</th>
@@ -1073,47 +1247,30 @@ export default function ManagementDashboard({
                                         </th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-slate-700/20">
-                                    {customers.length === 0 ? (
-                                        <tr>
-                                            <td
-                                                colSpan="5"
-                                                className="py-8 text-center opacity-60"
-                                            >
-                                                Belum ada data member. Masukkan
-                                                nomor WhatsApp pelanggan saat
-                                                transaksi di Kasir POS untuk
-                                                mendaftarkan member otomatis.
+                                <tbody className="divide-y divide-current/10">
+                                    {customers.map((c) => (
+                                        <tr key={c.id}>
+                                            <td className="py-3 font-mono font-bold text-purple-400">
+                                                {c.member_code}
+                                            </td>
+                                            <td className="py-3 font-bold">
+                                                {c.name}
+                                            </td>
+                                            <td className="py-3">{c.phone}</td>
+                                            <td className="py-3">
+                                                <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold">
+                                                    {c.orders_count}x Transaksi
+                                                </span>
+                                            </td>
+                                            <td className="py-3 text-right font-extrabold text-emerald-500">
+                                                Rp{" "}
+                                                {Number(
+                                                    c.orders_sum_grand_total ||
+                                                        0,
+                                                ).toLocaleString("id-ID")}
                                             </td>
                                         </tr>
-                                    ) : (
-                                        customers.map((c) => (
-                                            <tr key={c.id}>
-                                                <td className="py-3 font-mono font-bold text-purple-400">
-                                                    {c.member_code}
-                                                </td>
-                                                <td className="py-3 font-bold">
-                                                    {c.name}
-                                                </td>
-                                                <td className="py-3">
-                                                    {c.phone}
-                                                </td>
-                                                <td className="py-3">
-                                                    <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold">
-                                                        {c.orders_count}x
-                                                        Transaksi
-                                                    </span>
-                                                </td>
-                                                <td className="py-3 text-right font-extrabold text-emerald-500">
-                                                    Rp{" "}
-                                                    {Number(
-                                                        c.orders_sum_grand_total ||
-                                                            0,
-                                                    ).toLocaleString("id-ID")}
-                                                </td>
-                                            </tr>
-                                        ))
-                                    )}
+                                    ))}
                                 </tbody>
                             </table>
                         </div>

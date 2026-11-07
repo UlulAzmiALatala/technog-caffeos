@@ -30,7 +30,6 @@ export default function NeoBrutalCashier({
     return (
         <div className="min-h-screen bg-yellow-300 text-black p-6 font-sans">
             <div className="max-w-7xl mx-auto grid grid-cols-12 gap-6">
-                {/* Katalog Kiri */}
                 <div className="col-span-12 lg:col-span-8 space-y-6">
                     <div className="bg-white border-4 border-black p-5 rounded-2xl shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] flex justify-between items-center">
                         <div>
@@ -48,7 +47,6 @@ export default function NeoBrutalCashier({
                         </span>
                     </div>
 
-                    {/* Grid Menu Bento */}
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                         {menus.map((menu) => (
                             <div
@@ -57,6 +55,13 @@ export default function NeoBrutalCashier({
                                 className="cursor-pointer bg-white border-4 border-black p-4 rounded-2xl shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all flex flex-col justify-between"
                             >
                                 <div>
+                                    {menu.image && (
+                                        <img
+                                            src={menu.image}
+                                            alt={menu.name}
+                                            className="h-28 w-full object-cover rounded-xl border-2 border-black mb-2.5"
+                                        />
+                                    )}
                                     <span className="px-2 py-0.5 bg-cyan-300 border-2 border-black rounded text-[10px] font-black uppercase">
                                         {menu.category}
                                     </span>
@@ -82,7 +87,6 @@ export default function NeoBrutalCashier({
                         ))}
                     </div>
 
-                    {/* Antrean & Tombol Cetak Struk */}
                     <div className="bg-white border-4 border-black p-5 rounded-2xl shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] space-y-3">
                         <h2 className="font-black uppercase text-sm">
                             Antrean Aktif & Struk QR Token AI
@@ -133,7 +137,6 @@ export default function NeoBrutalCashier({
                     </div>
                 </div>
 
-                {/* Panel Checkout Kanan */}
                 <div className="col-span-12 lg:col-span-4 bg-white border-4 border-black p-6 rounded-2xl shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] flex flex-col justify-between h-fit space-y-4">
                     <div className="space-y-3">
                         <h2 className="text-lg font-black uppercase border-b-4 border-black pb-2">
@@ -190,6 +193,11 @@ export default function NeoBrutalCashier({
                                     <div>
                                         <p className="text-xs font-black">
                                             {item.name}
+                                            {item.notes && (
+                                                <span className="ml-1 text-[10px] bg-pink-300 px-1 rounded">
+                                                    ({item.notes})
+                                                </span>
+                                            )}
                                         </p>
                                         <p className="text-xs font-bold text-neutral-700">
                                             Rp{" "}

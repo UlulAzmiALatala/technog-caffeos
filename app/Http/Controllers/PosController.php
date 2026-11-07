@@ -112,6 +112,8 @@ class PosController extends Controller
 
         return Inertia::render('Pos/QueueBoard', [
             'cafe' => $cafe,
+            'templates' => Template::where('is_active', true)->get(),
+            'tables' => DiningTable::where('cafe_id', $cafe->id)->get(),
             'processingOrders' => Order::where('cafe_id', $cafe->id)
                 ->whereIn('order_status', ['paid', 'processing'])
                 ->whereDate('created_at', today())

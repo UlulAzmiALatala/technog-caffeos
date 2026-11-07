@@ -6,5 +6,19 @@ use Illuminate\Database\Eloquent\Model;
 
 class Expense extends Model
 {
-    //
+    protected $guarded = ['id'];
+
+    protected $casts = [
+        'expense_date' => 'date',
+    ];
+
+    public function cafe()
+    {
+        return $this->belongsTo(Cafe::class);
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
 }

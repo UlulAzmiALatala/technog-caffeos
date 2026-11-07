@@ -1,6 +1,6 @@
 import React from "react";
 import { useCartStore } from "@/Engine/useCartStore";
-import { Volume2, Printer, CreditCard, Banknote } from "lucide-react";
+import { Volume2, Printer, CreditCard, Banknote, Coffee } from "lucide-react";
 
 export default function MinimalistWoodCashier({
     menus,
@@ -30,7 +30,6 @@ export default function MinimalistWoodCashier({
     return (
         <div className="min-h-screen bg-amber-50/70 text-stone-800 p-8">
             <div className="max-w-7xl mx-auto space-y-6">
-                {/* Header Klasik */}
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-amber-200 flex justify-between items-center">
                     <div>
                         <h1 className="text-2xl font-serif font-bold text-amber-900">
@@ -46,7 +45,6 @@ export default function MinimalistWoodCashier({
                 </div>
 
                 <div className="grid grid-cols-12 gap-8">
-                    {/* Katalog Menu & Antrean Kiri */}
                     <div className="col-span-12 lg:col-span-7 space-y-6">
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-stone-200 space-y-4">
                             <h2 className="font-serif font-bold text-lg text-amber-950">
@@ -56,15 +54,28 @@ export default function MinimalistWoodCashier({
                                 {menus.map((menu) => (
                                     <div
                                         key={menu.id}
-                                        className="py-3.5 flex justify-between items-center"
+                                        className="py-3.5 flex justify-between items-center gap-4"
                                     >
-                                        <div>
-                                            <h3 className="font-bold text-stone-800">
-                                                {menu.name}
-                                            </h3>
-                                            <p className="text-xs text-stone-500">
-                                                {menu.description}
-                                            </p>
+                                        <div className="flex items-center gap-3.5">
+                                            {menu.image ? (
+                                                <img
+                                                    src={menu.image}
+                                                    alt={menu.name}
+                                                    className="w-14 h-14 rounded-lg object-cover border border-amber-200 shrink-0"
+                                                />
+                                            ) : (
+                                                <div className="w-14 h-14 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
+                                                    <Coffee className="w-6 h-6 text-amber-800" />
+                                                </div>
+                                            )}
+                                            <div>
+                                                <h3 className="font-bold text-stone-800">
+                                                    {menu.name}
+                                                </h3>
+                                                <p className="text-xs text-stone-500">
+                                                    {menu.description}
+                                                </p>
+                                            </div>
                                         </div>
                                         <div className="flex items-center gap-4 shrink-0">
                                             <span className="font-semibold text-amber-800">
@@ -85,7 +96,6 @@ export default function MinimalistWoodCashier({
                             </div>
                         </div>
 
-                        {/* Daftar Antrean, Call Queue, & Struk QR */}
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-stone-200 space-y-3">
                             <h2 className="font-serif font-bold text-base text-amber-950">
                                 Antrean Pesanan & Cetak Struk QR Token AI
@@ -140,7 +150,6 @@ export default function MinimalistWoodCashier({
                         </div>
                     </div>
 
-                    {/* Struk Kasir Kanan */}
                     <div className="col-span-12 lg:col-span-5 bg-white p-6 rounded-xl shadow-sm border border-stone-200 space-y-4 h-fit">
                         <h2 className="font-serif font-bold text-lg border-b pb-2 text-amber-950">
                             Nota Pemesanan
@@ -195,6 +204,11 @@ export default function MinimalistWoodCashier({
                                 >
                                     <span>
                                         {item.name} (x{item.qty})
+                                        {item.notes && (
+                                            <span className="ml-1 text-xs text-amber-800 font-semibold">
+                                                [{item.notes}]
+                                            </span>
+                                        )}
                                     </span>
                                     <div className="flex items-center gap-2">
                                         <span className="font-semibold">
