@@ -12,6 +12,7 @@ import {
     BarChart3,
     Award,
     Wallet,
+    Settings,
 } from "lucide-react";
 
 export default function OwnerDashboard({
@@ -28,6 +29,14 @@ export default function OwnerDashboard({
     const [prompt, setPrompt] = useState("");
     const isWood = auth.activeTemplate === "minimalist-wood";
 
+    const [settingsForm, setSettingsForm] = useState({
+        name: auth.cafe?.name || "",
+        address: auth.cafe?.address || "",
+        tax_percent: auth.cafe?.settings?.tax_percent ?? 10,
+        ai_quota_per_order: auth.cafe?.settings?.ai_quota_per_order ?? 5,
+        wifi_password: auth.cafe?.settings?.wifi_password ?? "kopitechnog123",
+    });
+
     const handleAskOwnerAi = (e) => {
         e.preventDefault();
         if (!prompt.trim()) return;
@@ -38,9 +47,18 @@ export default function OwnerDashboard({
         );
     };
 
+    const handleSaveSettings = (e) => {
+        e.preventDefault();
+        router.post(route("owner.settings.update"), settingsForm);
+    };
+
     const cardClass = isWood
         ? "bg-white border border-amber-200 text-stone-800 shadow-sm"
         : "bg-slate-900/80 border border-slate-800 text-slate-100";
+
+    const inputClass = isWood
+        ? "rounded-xl bg-amber-50/50 border-stone-300 text-stone-800 text-xs"
+        : "rounded-xl bg-slate-950 border-slate-800 text-white text-xs";
 
     const maxRevenue = Math.max(...revenueChart.map((d) => d.revenue), 1);
     const maxMenuQty = Math.max(...topMenus.map((m) => Number(m.total_qty)), 1);
@@ -121,9 +139,8 @@ export default function OwnerDashboard({
                     </div>
                 </div>
 
-                {/* Baris Visualisasi Grafik: Grafik Batang Omzet 7 Hari & Leaderboard Menu Terlaris */}
+                {/* Grafik Batang Omzet 7 Hari & Leaderboard Menu Terlaris */}
                 <div className="grid grid-cols-12 gap-6">
-                    {/* Grafik Tren Omzet 7 Hari Terakhir */}
                     <div
                         className={`col-span-12 lg:col-span-7 p-6 rounded-2xl ${cardClass}`}
                     >
@@ -175,7 +192,6 @@ export default function OwnerDashboard({
                         </div>
                     </div>
 
-                    {/* Leaderboard Top 5 Menu Terlaris */}
                     <div
                         className={`col-span-12 lg:col-span-5 p-6 rounded-2xl ${cardClass}`}
                     >
@@ -232,7 +248,7 @@ export default function OwnerDashboard({
                     </div>
                 </div>
 
-                {/* Grid Bawah: AI Co-Worker for Owner (Kiri) & Audit Shift + Transaksi (Kanan) */}
+                {/* Grid Bawah: AI Co-Worker for Owner & Audit Shift + Pengaturan Kafe */}
                 <div className="grid grid-cols-12 gap-6">
                     {/* Panel AI CO-WORKER FOR OWNER */}
                     <div
@@ -254,7 +270,7 @@ export default function OwnerDashboard({
                                 </div>
                             </div>
 
-                            <div className="h-72 overflow-y-auto space-y-3 p-3 rounded-xl bg-slate-950/80 text-slate-100 border border-slate-800 mb-4">
+                            <div className="h-80 overflow-y-auto space-y-3 p-3 rounded-xl bg-slate-950/80 text-slate-100 border border-slate-800 mb-4">
                                 {ownerChatLogs.length === 0 && (
                                     <div className="text-center py-10 px-4 space-y-2 text-xs text-slate-400">
                                         <Sparkles className="w-6 h-6 text-purple-400 mx-auto" />
@@ -302,8 +318,96 @@ export default function OwnerDashboard({
                         </form>
                     </div>
 
-                    {/* Tabel Audit Laci Shift Kasir & Riwayat Transaksi */}
+                    {/* Tabel Audit Laci Shift Kasir & Pengaturan Kafe (Tenant Settings) */}
                     <div className="col-span-12 lg:col-span-7 space-y-6">
+                        {/* Form Pengaturan Kafe, Kuota Token AI & WiFi Struk */}
+                        <form
+                            onSubmit={handleSaveSettings}
+                            className={`p-6 rounded-2xl space-y-4 ${cardClass}`}
+                        >
+                            <h2 className="font-bold text-base flex items-center gap-2 border-b border-slate-700/20 pb-2">
+                                <Settings className="w-4 h-4 text-emerald-500" />{" "}
+                                Pengaturan Profil Kafe, Token AI & Info Struk
+                                Thermal
+                            </h2>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-[11px] opacity-70">
+                                        Nama Brand Kafe
+                                    </label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={settingsForm.name}
+                                        onChange={(e) =>
+                                            setSettingsForm({
+                                                ...settingsForm,
+                                                name: e.target.value,
+                                            })
+                                        }
+                                        className={`w-full mt-1 ${inputClass}`}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[11px] opacity-70">
+                                        Alamat Lengkap (Tercetak di Struk)
+                                    </label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={settingsForm.address}
+                                        onChange={(e) =>
+                                            setSettingsForm({
+                                                ...settingsForm,
+                                                address: e.target.value,
+                                            })
+                                        }
+                                        className={`w-full mt-1 ${inputClass}`}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[11px] opacity-70">
+                                        Kuota Prompt AI Pelanggan per Order
+                                    </label>
+                                    <input
+                                        type="number"
+                                        required
+                                        value={settingsForm.ai_quota_per_order}
+                                        onChange={(e) =>
+                                            setSettingsForm({
+                                                ...settingsForm,
+                                                ai_quota_per_order:
+                                                    e.target.value,
+                                            })
+                                        }
+                                        className={`w-full mt-1 ${inputClass}`}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[11px] opacity-70">
+                                        Password Free WiFi (Tercetak di Struk)
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={settingsForm.wifi_password}
+                                        onChange={(e) =>
+                                            setSettingsForm({
+                                                ...settingsForm,
+                                                wifi_password: e.target.value,
+                                            })
+                                        }
+                                        className={`w-full mt-1 ${inputClass}`}
+                                    />
+                                </div>
+                            </div>
+                            <button
+                                type="submit"
+                                className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs"
+                            >
+                                Simpan Pengaturan Kafe
+                            </button>
+                        </form>
+
                         <div className={`p-6 rounded-2xl ${cardClass}`}>
                             <h2 className="font-bold text-base mb-3 flex items-center gap-2">
                                 <Wallet className="w-4 h-4 text-emerald-500" />{" "}
@@ -368,58 +472,6 @@ export default function OwnerDashboard({
                                                             )}
                                                         </span>
                                                     )}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                        <div className={`p-6 rounded-2xl ${cardClass}`}>
-                            <h2 className="font-bold text-base mb-3">
-                                Riwayat Transaksi Real-Time
-                            </h2>
-                            <div className="overflow-x-auto max-h-56">
-                                <table className="w-full text-xs text-left">
-                                    <thead className="uppercase opacity-60 border-b border-slate-700/30">
-                                        <tr>
-                                            <th className="py-2">Antrean</th>
-                                            <th className="py-2">Pelanggan</th>
-                                            <th className="py-2">Metode</th>
-                                            <th className="py-2">Diskon</th>
-                                            <th className="py-2 text-right">
-                                                Grand Total
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-700/20">
-                                        {recentOrders.map((ord) => (
-                                            <tr key={ord.id}>
-                                                <td className="py-2 font-bold text-emerald-500">
-                                                    #{ord.queue_number}
-                                                </td>
-                                                <td className="py-2">
-                                                    {ord.customer_name}
-                                                </td>
-                                                <td className="py-2 uppercase">
-                                                    {
-                                                        ord.payment
-                                                            ?.payment_method
-                                                    }
-                                                </td>
-                                                <td className="py-2 text-purple-400">
-                                                    {Number(
-                                                        ord.discount_total,
-                                                    ) > 0
-                                                        ? `-Rp ${Number(ord.discount_total).toLocaleString("id-ID")}`
-                                                        : "-"}
-                                                </td>
-                                                <td className="py-2 text-right font-bold">
-                                                    Rp{" "}
-                                                    {Number(
-                                                        ord.grand_total,
-                                                    ).toLocaleString("id-ID")}
                                                 </td>
                                             </tr>
                                         ))}

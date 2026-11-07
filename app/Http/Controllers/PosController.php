@@ -31,7 +31,6 @@ class PosController extends Controller
             ]
         );
 
-        // Buat 1 Voucher Starter otomatis jika kafe belum punya voucher
         if (Voucher::where('cafe_id', $cafeId)->count() === 0) {
             Voucher::create([
                 'cafe_id' => $cafeId,
@@ -58,19 +57,20 @@ class PosController extends Controller
         ];
 
         if ($activeShift) {
-            $cashSales = Payment::whereHas('order', function ($q) use ($cafeId, $activeShift) {
-                $q->where('cafe_id', $cafeId)->where('created_at', '>=', $activeShift->opened_at);
-            })
-                ->where('payment_status', 'paid')
-                ->where('payment_method', 'cash')
-                ->sum('amount_paid');
+            // Total penjualan tunai bersih adalah grand_total dari order yang dibayar cash
+            $cashSales = Order::where('cafe_id', $cafeId)
+                ->where('created_at', '>=', $activeShift->opened_at)
+                ->whereHas('payment', function ($q) {
+                    $q->where('payment_status', 'paid')->where('payment_method', 'cash');
+                })
+                ->sum('grand_total');
 
-            $qrisSales = Payment::whereHas('order', function ($q) use ($cafeId, $activeShift) {
-                $q->where('cafe_id', $cafeId)->where('created_at', '>=', $activeShift->opened_at);
-            })
-                ->where('payment_status', 'paid')
-                ->where('payment_method', '!=', 'cash')
-                ->sum('amount_paid');
+            $qrisSales = Order::where('cafe_id', $cafeId)
+                ->where('created_at', '>=', $activeShift->opened_at)
+                ->whereHas('payment', function ($q) {
+                    $q->where('payment_status', 'paid')->where('payment_method', '!=', 'cash');
+                })
+                ->sum('grand_total');
 
             $shiftStats = [
                 'cash_sales' => (float) $cashSales,
@@ -101,6 +101,26 @@ class PosController extends Controller
                 ->where('cafe_id', $cafeId)
                 ->latest()
                 ->take(15)
+                ->get(),
+        ]);
+    }
+
+    // Halaman Layar TV Monitor Antrean Live (Dapur Proses vs Siap Saji)
+    public function queueBoard(Request $request)
+    {
+        $cafe = $request->user()->cafe;
+
+        return Inertia::render('Pos/QueueBoard', [
+            'cafe' => $cafe,
+            'processingOrders' => Order::where('cafe_id', $cafe->id)
+                ->whereIn('order_status', ['paid', 'processing'])
+                ->whereDate('created_at', today())
+                ->oldest()
+                ->get(),
+            'readyOrders' => Order::where('cafe_id', $cafe->id)
+                ->where('order_status', 'ready')
+                ->whereDate('created_at', today())
+                ->latest('updated_at')
                 ->get(),
         ]);
     }
@@ -149,19 +169,19 @@ class PosController extends Controller
             ->latest('opened_at')
             ->firstOrFail();
 
-        $cashSales = Payment::whereHas('order', function ($q) use ($cafeId, $activeShift) {
-            $q->where('cafe_id', $cafeId)->where('created_at', '>=', $activeShift->opened_at);
-        })
-            ->where('payment_status', 'paid')
-            ->where('payment_method', 'cash')
-            ->sum('amount_paid');
+        $cashSales = Order::where('cafe_id', $cafeId)
+            ->where('created_at', '>=', $activeShift->opened_at)
+            ->whereHas('payment', function ($q) {
+                $q->where('payment_status', 'paid')->where('payment_method', 'cash');
+            })
+            ->sum('grand_total');
 
-        $qrisSales = Payment::whereHas('order', function ($q) use ($cafeId, $activeShift) {
-            $q->where('cafe_id', $cafeId)->where('created_at', '>=', $activeShift->opened_at);
-        })
-            ->where('payment_status', 'paid')
-            ->where('payment_method', '!=', 'cash')
-            ->sum('amount_paid');
+        $qrisSales = Order::where('cafe_id', $cafeId)
+            ->where('created_at', '>=', $activeShift->opened_at)
+            ->whereHas('payment', function ($q) {
+                $q->where('payment_status', 'paid')->where('payment_method', '!=', 'cash');
+            })
+            ->sum('grand_total');
 
         $expectedCash = (float) $activeShift->opening_cash + (float) $cashSales;
         $actualCash = (float) $validated['actual_cash'];
@@ -202,6 +222,7 @@ class PosController extends Controller
             'order_type' => 'required|in:dine_in,takeaway,delivery',
             'payment_method' => 'required|in:cash,qris,va,ewallet',
             'voucher_id' => 'nullable|exists:vouchers,id',
+            'cash_received' => 'nullable|numeric|min:0',
             'items' => 'required|array|min:1',
             'items.*.menu_id' => 'required|exists:menus,id',
             'items.*.qty' => 'required|integer|min:1',
@@ -209,8 +230,10 @@ class PosController extends Controller
         ]);
 
         $cafeId = $request->user()->cafe_id;
+        $cafeSettings = $request->user()->cafe->settings ?? [];
+        $aiQuotaLimit = (int) ($cafeSettings['ai_quota_per_order'] ?? 5);
 
-        return DB::transaction(function () use ($validated, $cafeId, $request) {
+        return DB::transaction(function () use ($validated, $cafeId, $aiQuotaLimit, $request) {
             $todayCount = Order::where('cafe_id', $cafeId)->whereDate('created_at', today())->count();
             $queueNumber = $todayCount + 1;
 
@@ -237,7 +260,6 @@ class PosController extends Controller
                 }
             }
 
-            // Hitung potongan Voucher Promo jika ada
             $discountTotal = 0;
             if (!empty($validated['voucher_id'])) {
                 $voucher = Voucher::where('cafe_id', $cafeId)
@@ -255,6 +277,10 @@ class PosController extends Controller
             }
 
             $grandTotal = max(0, $subtotal - $discountTotal);
+            $amountPaid = $validated['payment_method'] === 'cash' && !empty($validated['cash_received'])
+                ? max($grandTotal, (float) $validated['cash_received'])
+                : $grandTotal;
+            $changeAmount = max(0, $amountPaid - $grandTotal);
 
             $customer = null;
             if (!empty($validated['customer_phone'])) {
@@ -288,7 +314,8 @@ class PosController extends Controller
                 'order_id' => $order->id,
                 'payment_method' => $validated['payment_method'],
                 'payment_status' => 'paid',
-                'amount_paid' => $grandTotal,
+                'amount_paid' => $amountPaid,
+                'change_amount' => $changeAmount,
                 'paid_at' => now(),
             ]);
 
@@ -297,12 +324,12 @@ class PosController extends Controller
                 'order_id' => $order->id,
                 'token_code' => 'AI-' . strtoupper(Str::random(8)),
                 'token_type' => 'customer_order',
-                'quota_limit' => 5,
+                'quota_limit' => $aiQuotaLimit,
                 'expires_at' => now()->addHours(4),
             ]);
 
             return back()->with([
-                'success' => "Order #{$order->queue_number} berhasil! " . ($discountTotal > 0 ? "Hemat Rp " . number_format($discountTotal, 0, ',', '.') : ""),
+                'success' => "Order #{$order->queue_number} berhasil! " . ($changeAmount > 0 ? "Kembalian Tunai: Rp " . number_format($changeAmount, 0, ',', '.') : ""),
                 'ai_token' => $aiToken->token_code,
             ]);
         });

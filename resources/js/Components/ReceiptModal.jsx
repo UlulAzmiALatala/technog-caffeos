@@ -1,17 +1,21 @@
 import React from "react";
-import { Printer, X, Sparkles } from "lucide-react";
+import { Printer, X, Sparkles, Wifi } from "lucide-react";
 
-export default function ReceiptModal({ order, cafeName, onClose }) {
+export default function ReceiptModal({
+    order,
+    cafeName,
+    cafeSettings,
+    onClose,
+}) {
     if (!order) return null;
 
-    // URL langsung menuju halaman Status Order & AI Chatbot Co-Worker milik pelanggan
     const aiOrderUrl = route("customer.order-status", order.order_code);
     const qrTokenImg = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(aiOrderUrl)}`;
 
     return (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white text-slate-950 rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-4 font-mono text-xs">
-                {/* Header Tombol Aksi (Disembunyikan saat Print) */}
+            <div className="bg-white text-slate-950 rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-3.5 font-mono text-xs max-h-[92vh] overflow-y-auto">
+                {/* Header Tombol Aksi */}
                 <div className="flex justify-between items-center border-b pb-3 print:hidden font-sans">
                     <span className="font-bold text-sm text-slate-700">
                         Preview Struk Thermal (58mm/80mm)
@@ -24,7 +28,7 @@ export default function ReceiptModal({ order, cafeName, onClose }) {
                     </button>
                 </div>
 
-                {/* Area Struk Cetak */}
+                {/* Identitas Kafe */}
                 <div className="text-center space-y-1 border-b border-dashed border-slate-400 pb-3">
                     <h2 className="text-base font-extrabold uppercase">
                         {cafeName || "TechnoG CaffeOS"}
@@ -64,7 +68,7 @@ export default function ReceiptModal({ order, cafeName, onClose }) {
                     </div>
                 </div>
 
-                {/* Rincian Item Menu */}
+                {/* Rincian Item Menu + Catatan Khusus */}
                 <div className="space-y-2 border-b border-dashed border-slate-400 pb-3">
                     {order.items?.map((item) => (
                         <div
@@ -81,6 +85,11 @@ export default function ReceiptModal({ order, cafeName, onClose }) {
                                         "id-ID",
                                     )}
                                 </p>
+                                {item.notes && (
+                                    <p className="text-[10px] italic text-slate-600">
+                                        Catatan: {item.notes}
+                                    </p>
+                                )}
                             </div>
                             <span className="font-semibold">
                                 Rp{" "}
@@ -90,15 +99,69 @@ export default function ReceiptModal({ order, cafeName, onClose }) {
                     ))}
                 </div>
 
-                {/* Grand Total */}
-                <div className="flex justify-between text-sm font-extrabold border-b border-dashed border-slate-400 pb-3">
-                    <span>TOTAL BAYAR</span>
-                    <span>
-                        Rp {Number(order.grand_total).toLocaleString("id-ID")}
-                    </span>
+                {/* Subtotal, Diskon, Grand Total, & Kembalian Tunai */}
+                <div className="space-y-1 border-b border-dashed border-slate-400 pb-3 text-[11px]">
+                    <div className="flex justify-between">
+                        <span>Subtotal</span>
+                        <span>
+                            Rp {Number(order.subtotal).toLocaleString("id-ID")}
+                        </span>
+                    </div>
+                    {Number(order.discount_total) > 0 && (
+                        <div className="flex justify-between text-emerald-700 font-bold">
+                            <span>Diskon Promo</span>
+                            <span>
+                                -Rp{" "}
+                                {Number(order.discount_total).toLocaleString(
+                                    "id-ID",
+                                )}
+                            </span>
+                        </div>
+                    )}
+                    <div className="flex justify-between text-sm font-extrabold pt-1">
+                        <span>GRAND TOTAL</span>
+                        <span>
+                            Rp{" "}
+                            {Number(order.grand_total).toLocaleString("id-ID")}
+                        </span>
+                    </div>
+                    {order.payment?.payment_method === "cash" &&
+                        Number(order.payment?.amount_paid) > 0 && (
+                            <>
+                                <div className="flex justify-between pt-1">
+                                    <span>Tunai Diterima</span>
+                                    <span>
+                                        Rp{" "}
+                                        {Number(
+                                            order.payment.amount_paid,
+                                        ).toLocaleString("id-ID")}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between font-bold">
+                                    <span>Uang Kembalian</span>
+                                    <span>
+                                        Rp{" "}
+                                        {Number(
+                                            order.payment.change_amount || 0,
+                                        ).toLocaleString("id-ID")}
+                                    </span>
+                                </div>
+                            </>
+                        )}
                 </div>
 
-                {/* Bagian QR Code Token AI Sesuai Flowchart Gambar 1 */}
+                {/* Info Free WiFi Kafe */}
+                {cafeSettings?.wifi_password && (
+                    <div className="p-2 rounded-lg bg-slate-100 text-center text-[11px] flex items-center justify-center gap-1.5">
+                        <Wifi className="w-3.5 h-3.5" />
+                        <span>
+                            Free WiFi Password:{" "}
+                            <strong>{cafeSettings.wifi_password}</strong>
+                        </span>
+                    </div>
+                )}
+
+                {/* Bagian QR Code Token AI */}
                 {order.ai_token ? (
                     <div className="text-center space-y-2 pt-1">
                         <div className="inline-flex items-center gap-1 text-[11px] font-bold text-purple-700 bg-purple-100 px-2.5 py-0.5 rounded-full">
@@ -115,7 +178,7 @@ export default function ReceiptModal({ order, cafeName, onClose }) {
                         </p>
                         <p className="text-[10px] text-slate-500 leading-tight">
                             Scan QR di atas untuk memantau status dapur &
-                            konsultasi gratis dengan AI Co-Worker (Kuota:{" "}
+                            konsultasi dengan AI Co-Worker (Kuota:{" "}
                             {order.ai_token.quota_limit}x chat).
                         </p>
                     </div>
@@ -127,7 +190,7 @@ export default function ReceiptModal({ order, cafeName, onClose }) {
                 )}
 
                 {/* Tombol Print & Tutup */}
-                <div className="flex gap-2 pt-3 print:hidden font-sans">
+                <div className="flex gap-2 pt-2 print:hidden font-sans">
                     <button
                         onClick={() => window.print()}
                         className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5"

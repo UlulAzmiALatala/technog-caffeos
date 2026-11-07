@@ -29,16 +29,18 @@ Route::get('/dashboard', function (Request $request) {
     };
 })->middleware(['auth', 'verified'])->name('dashboard');
 
-// 4. Grup Route Eksklusif OWNER (Super Admin: Monitoring, Export, & AI Co-Worker for Owner)
+// 4. Grup Route Eksklusif OWNER (Super Admin: Monitoring, Export, Settings, & AI Co-Worker for Owner)
 Route::middleware(['auth', 'role:owner'])->group(function () {
     Route::get('/owner', [OwnerController::class, 'index'])->name('owner.dashboard');
     Route::post('/owner/ai-chat', [OwnerController::class, 'askOwnerAi'])->name('owner.ask-ai');
+    Route::post('/owner/settings', [OwnerController::class, 'updateCafeSettings'])->name('owner.settings.update');
     Route::get('/owner/export-csv', [OwnerController::class, 'exportCsv'])->name('owner.export');
 });
 
-// 5. Grup Route Operasional POS, Shift Kasir & Manajemen Dapur (Owner, Cashier, & Barista)
+// 5. Grup Route Operasional POS, TV Antrean, Shift Kasir & Manajemen Dapur (Owner, Cashier, & Barista)
 Route::middleware(['auth', 'role:owner,cashier,barista'])->group(function () {
     Route::get('/pos', [PosController::class, 'index'])->name('pos.index');
+    Route::get('/queue-board', [PosController::class, 'queueBoard'])->name('pos.queue-board');
     Route::post('/pos/checkout', [PosController::class, 'checkout'])->name('pos.checkout');
     Route::post('/pos/switch-template', [PosController::class, 'switchTemplate'])->name('pos.switch-template');
     Route::post('/pos/orders/{order}/approve-cash', [PosController::class, 'approveCashOrder'])->name('pos.approve-cash');

@@ -10,7 +10,10 @@ export const useCartStore = create(
             tableId: "",
             orderType: "dine_in",
             paymentMethod: "qris",
-            appliedVoucher: null, // Menyimpan objek voucher yang dipilih
+            appliedVoucher: null,
+            cashReceived: "",
+            selectedCategory: "ALL",
+            searchQuery: "",
 
             setCustomerName: (name) => set({ customerName: name }),
             setCustomerPhone: (phone) => set({ customerPhone: phone }),
@@ -18,6 +21,9 @@ export const useCartStore = create(
             setOrderType: (type) => set({ orderType: type }),
             setPaymentMethod: (method) => set({ paymentMethod: method }),
             setAppliedVoucher: (voucher) => set({ appliedVoucher: voucher }),
+            setCashReceived: (amount) => set({ cashReceived: amount }),
+            setSelectedCategory: (cat) => set({ selectedCategory: cat }),
+            setSearchQuery: (q) => set({ searchQuery: q }),
 
             addToCart: (menu) => {
                 const currentCart = get().cart;
@@ -60,6 +66,14 @@ export const useCartStore = create(
                 set({ cart: updated });
             },
 
+            updateItemNotes: (menuId, notes) => {
+                set({
+                    cart: get().cart.map((item) =>
+                        item.menu_id === menuId ? { ...item, notes } : item,
+                    ),
+                });
+            },
+
             getSubtotal: () => {
                 return get().cart.reduce(
                     (sum, item) => sum + item.price * item.qty,
@@ -90,6 +104,15 @@ export const useCartStore = create(
                 return Math.max(0, subtotal - discount);
             },
 
+            getChangeAmount: () => {
+                const total = get().getTotal();
+                const received = Number(get().cashReceived || 0);
+                if (get().paymentMethod !== "cash" || received <= total) {
+                    return 0;
+                }
+                return received - total;
+            },
+
             clearCart: () =>
                 set({
                     cart: [],
@@ -97,6 +120,7 @@ export const useCartStore = create(
                     customerPhone: "",
                     tableId: "",
                     appliedVoucher: null,
+                    cashReceived: "",
                 }),
         }),
         {

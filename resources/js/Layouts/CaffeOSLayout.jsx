@@ -9,6 +9,7 @@ import {
     Sparkles,
     Palette,
     ShieldCheck,
+    Tv,
 } from "lucide-react";
 
 export default function CaffeOSLayout({
@@ -20,14 +21,13 @@ export default function CaffeOSLayout({
     const userRole = auth.user?.role || "cashier";
     const isWoodTemplate = auth.activeTemplate === "minimalist-wood";
 
-    // Daftar Menu Navigasi Berdasarkan Role (Owner = Super Admin, Cashier, Barista)
     const navItems = [
         {
             name: "Owner Monitoring & AI",
             href: route("owner.dashboard"),
             active: route().current("owner.*"),
             icon: LayoutDashboard,
-            roles: ["owner"], // Khusus Owner
+            roles: ["owner"],
         },
         {
             name: "Kasir POS & Call Queue",
@@ -37,7 +37,7 @@ export default function CaffeOSLayout({
             roles: ["owner", "cashier", "barista"],
         },
         {
-            name: "Dapur, Menu & Stok",
+            name: "Dapur, Menu & Promo",
             href: route("management.index"),
             active: route().current("management.*"),
             icon: ChefHat,
@@ -53,15 +53,12 @@ export default function CaffeOSLayout({
         router.post(route("logout"));
     };
 
-    // =========================================================================
-    // LAYOUT A: TOP HEADER (Aktif jika memilih Template "Minimalist Warm Wood")
-    // =========================================================================
+    // LAYOUT A: TOP HEADER (Minimalist Warm Wood)
     if (isWoodTemplate) {
         return (
             <div className="min-h-screen bg-amber-50/70 text-stone-800 flex flex-col">
                 <header className="bg-amber-950 text-amber-50 shadow-md sticky top-0 z-30">
                     <div className="max-w-7xl mx-auto px-6 py-3.5 flex flex-wrap justify-between items-center gap-4">
-                        {/* Brand & Role Info */}
                         <div className="flex items-center gap-6">
                             <div>
                                 <span className="text-lg font-serif font-bold text-amber-300 tracking-wide">
@@ -72,7 +69,6 @@ export default function CaffeOSLayout({
                                 </span>
                             </div>
 
-                            {/* Menu Navigasi Horizontal (Header) */}
                             <nav className="flex items-center gap-2">
                                 {navItems.map((item) => {
                                     const Icon = item.icon;
@@ -91,10 +87,18 @@ export default function CaffeOSLayout({
                                         </Link>
                                     );
                                 })}
+
+                                <a
+                                    href={route("pos.queue-board")}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="px-3 py-2 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-1.5"
+                                >
+                                    <Tv className="w-4 h-4" /> TV Antrean ↗
+                                </a>
                             </nav>
                         </div>
 
-                        {/* Switcher Template & Logout */}
                         <div className="flex items-center gap-3 text-xs">
                             {templates.length > 0 && (
                                 <div className="flex items-center gap-1 bg-amber-900/80 p-1 rounded-lg border border-amber-800">
@@ -126,7 +130,6 @@ export default function CaffeOSLayout({
                         </div>
                     </div>
 
-                    {/* Sub-Header Simulasi QR & Flash Message */}
                     <div className="bg-amber-900/90 px-6 py-1.5 text-xs flex justify-between items-center border-t border-amber-800/60">
                         <div className="flex items-center gap-2">
                             <span className="text-amber-200">
@@ -159,15 +162,11 @@ export default function CaffeOSLayout({
         );
     }
 
-    // =========================================================================
-    // LAYOUT B: LEFT SIDEBAR (Aktif jika memilih Template "CyberDark")
-    // =========================================================================
+    // LAYOUT B: LEFT SIDEBAR (CyberDark & Neo-Brutalist)
     return (
         <div className="min-h-screen bg-slate-950 text-slate-100 flex">
-            {/* Sidebar Kiri */}
             <aside className="w-64 bg-slate-900/90 backdrop-blur-xl border-r border-slate-800 flex flex-col justify-between shrink-0 sticky top-0 h-screen">
-                <div className="p-5 space-y-6">
-                    {/* Identitas Kafe & Role */}
+                <div className="p-5 space-y-5 overflow-y-auto">
                     <div className="p-3.5 rounded-2xl bg-slate-950 border border-emerald-500/20">
                         <div className="flex items-center gap-2 text-emerald-400 font-bold text-base">
                             <Sparkles className="w-5 h-5" /> {auth.cafe?.name}
@@ -180,7 +179,6 @@ export default function CaffeOSLayout({
                         </div>
                     </div>
 
-                    {/* Menu Navigasi Vertikal (Sidebar) */}
                     <div className="space-y-1.5">
                         <p className="px-3 text-[10px] font-bold uppercase tracking-wider text-slate-500">
                             Menu Operasional ({userRole})
@@ -201,9 +199,17 @@ export default function CaffeOSLayout({
                                 </Link>
                             );
                         })}
+
+                        <a
+                            href={route("pos.queue-board")}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="w-full px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-3 bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/25 transition mt-2"
+                        >
+                            <Tv className="w-4 h-4" /> Layar TV Antrean ↗
+                        </a>
                     </div>
 
-                    {/* Pintasan Simulasi Scan QR Meja */}
                     {tables.length > 0 && (
                         <div className="space-y-2 pt-2 border-t border-slate-800">
                             <p className="px-3 text-[10px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
@@ -227,7 +233,6 @@ export default function CaffeOSLayout({
                     )}
                 </div>
 
-                {/* Bagian Bawah Sidebar: Switcher Template & Logout */}
                 <div className="p-4 border-t border-slate-800 space-y-3 bg-slate-950/50">
                     {templates.length > 0 && (
                         <div className="space-y-1.5">
@@ -268,7 +273,6 @@ export default function CaffeOSLayout({
                 </div>
             </aside>
 
-            {/* Konten Utama */}
             <div className="flex-1 flex flex-col min-w-0">
                 {flash?.success && (
                     <div className="bg-emerald-500/10 border-b border-emerald-500/30 text-emerald-300 px-6 py-2.5 text-xs font-semibold flex justify-between items-center">

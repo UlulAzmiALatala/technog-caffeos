@@ -31,7 +31,6 @@ class OwnerController extends Controller
         $totalOrdersCount = Order::where('cafe_id', $cafeId)->count();
         $lowStocks = Stock::where('cafe_id', $cafeId)->whereColumn('current_qty', '<=', 'min_qty_alert')->get();
 
-        // 1. Data Grafik Tren Omzet 7 Hari Terakhir
         $revenueChart = [];
         for ($i = 6; $i >= 0; $i--) {
             $date = today()->subDays($i);
@@ -46,7 +45,6 @@ class OwnerController extends Controller
             ];
         }
 
-        // 2. Data Grafik Top 5 Menu Terlaris
         $topMenus = OrderItem::select('menu_id', DB::raw('SUM(qty) as total_qty'), DB::raw('SUM(subtotal) as total_sales'))
             ->whereHas('order', function ($q) use ($cafeId) {
                 $q->where('cafe_id', $cafeId)->where('order_status', '!=', 'pending');
@@ -57,7 +55,6 @@ class OwnerController extends Controller
             ->take(5)
             ->get();
 
-        // 3. Token Khusus "AI Co-Worker for Owner"
         $ownerToken = AiToken::firstOrCreate(
             [
                 'cafe_id' => $cafeId,
@@ -96,6 +93,31 @@ class OwnerController extends Controller
         ]);
     }
 
+    // Update Pengaturan Kafe, Kuota Token AI, & Password WiFi Struk
+    public function updateCafeSettings(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:150',
+            'address' => 'required|string|max:255',
+            'tax_percent' => 'required|numeric|min:0|max:50',
+            'ai_quota_per_order' => 'required|integer|min:1|max:50',
+            'wifi_password' => 'nullable|string|max:100',
+        ]);
+
+        $cafe = $request->user()->cafe;
+        $cafe->update([
+            'name' => $validated['name'],
+            'address' => $validated['address'],
+            'settings' => [
+                'tax_percent' => (float) $validated['tax_percent'],
+                'ai_quota_per_order' => (int) $validated['ai_quota_per_order'],
+                'wifi_password' => $validated['wifi_password'] ?? '',
+            ],
+        ]);
+
+        return back()->with('success', 'Pengaturan Profil Kafe, Kuota AI & Info Struk berhasil disimpan!');
+    }
+
     public function askOwnerAi(Request $request)
     {
         $request->validate(['prompt' => 'required|string|max:500']);
@@ -115,7 +137,7 @@ class OwnerController extends Controller
         $businessContext = "Total Omzet: Rp " . number_format($totalRevenue, 0, ',', '.') .
             " dari {$orderCount} transaksi. Status Stok Gudang: [{$stocksSummary}]. Daftar Menu: [{$menusSummary}].";
 
-        $reply = "Berdasarkan data real-time {$user->cafe->name} saat ini ({$businessContext}), saran strategis untuk pertanyaan Anda \"{$request->prompt}\": Pastikan bahan baku dengan stok rendah segera di-restock dan manfaatkan fitur Voucher Promo (seperti HEMAT20) pada jam sepi untuk meningkatkan volume transaksi.";
+        $reply = "Berdasarkan data real-time {$user->cafe->name} saat ini ({$businessContext}), saran strategis untuk pertanyaan Anda \"{$request->prompt}\": Pastikan bahan baku dengan stok rendah segera di-restock dan manfaatkan fitur Voucher Promo pada jam sepi untuk meningkatkan volume transaksi.";
 
         if (env('GEMINI_API_KEY')) {
             try {
