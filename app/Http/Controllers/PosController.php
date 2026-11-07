@@ -10,6 +10,7 @@ use App\Models\Menu;
 use App\Models\Order;
 use App\Models\Payment;
 use App\Models\Template;
+use App\Models\Voucher;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -17,12 +18,10 @@ use Inertia\Inertia;
 
 class PosController extends Controller
 {
-    // 1. Halaman Utama POS Kasir / Barista / Owner + Status Shift Aktif
     public function index(Request $request)
     {
         $cafeId = $request->user()->cafe_id;
 
-        // Pastikan Template ke-3 (Neo-Brutalist Pop) tersedia di database
         Template::firstOrCreate(
             ['slug' => 'neo-brutal'],
             [
@@ -32,7 +31,20 @@ class PosController extends Controller
             ]
         );
 
-        // Cek apakah ada Shift Kasir yang sedang berstatus 'open' di kafe ini
+        // Buat 1 Voucher Starter otomatis jika kafe belum punya voucher
+        if (Voucher::where('cafe_id', $cafeId)->count() === 0) {
+            Voucher::create([
+                'cafe_id' => $cafeId,
+                'code' => 'HEMAT20',
+                'name' => 'Promo Spesial Diskon 20%',
+                'discount_type' => 'percent',
+                'discount_value' => 20,
+                'min_order_amount' => 15000,
+                'quota' => 100,
+                'is_active' => true,
+            ]);
+        }
+
         $activeShift = CashierShift::with('user')
             ->where('cafe_id', $cafeId)
             ->where('status', 'open')
@@ -46,7 +58,6 @@ class PosController extends Controller
         ];
 
         if ($activeShift) {
-            // Hitung otomatis semua pembayaran lunas sejak shift dibuka
             $cashSales = Payment::whereHas('order', function ($q) use ($cafeId, $activeShift) {
                 $q->where('cafe_id', $cafeId)->where('created_at', '>=', $activeShift->opened_at);
             })
@@ -75,6 +86,10 @@ class PosController extends Controller
                 ->get(),
             'tables' => DiningTable::where('cafe_id', $cafeId)->get(),
             'templates' => Template::where('is_active', true)->get(),
+            'vouchers' => Voucher::where('cafe_id', $cafeId)
+                ->where('is_active', true)
+                ->whereColumn('used_count', '<', 'quota')
+                ->get(),
             'recentOrders' => Order::with(['items.menu', 'payment', 'table', 'aiToken'])
                 ->where('cafe_id', $cafeId)
                 ->latest()
@@ -90,7 +105,6 @@ class PosController extends Controller
         ]);
     }
 
-    // 2. Buka Shift Kasir Baru (Input Modal Awal / Petty Cash)
     public function openShift(Request $request)
     {
         $validated = $request->validate([
@@ -100,7 +114,6 @@ class PosController extends Controller
 
         $cafeId = $request->user()->cafe_id;
 
-        // Pastikan tidak ada shift ganda yang terbuka
         $existing = CashierShift::where('cafe_id', $cafeId)->where('status', 'open')->first();
         if ($existing) {
             return back()->with('success', 'Shift kasir sudah terbuka.');
@@ -122,7 +135,6 @@ class PosController extends Controller
         );
     }
 
-    // 3. Tutup Shift Kasir & Rekap Selisih Uang Fisik di Laci
     public function closeShift(Request $request)
     {
         $validated = $request->validate([
@@ -173,7 +185,6 @@ class PosController extends Controller
         return back()->with('success', "Shift Kasir resmi ditutup! Status Laci: {$statusText}.");
     }
 
-    // 4. Ganti Template UI secara Real-Time
     public function switchTemplate(Request $request)
     {
         $request->validate(['template_id' => 'required|exists:templates,id']);
@@ -182,7 +193,6 @@ class PosController extends Controller
         return back()->with('success', 'Template UI Kafe berhasil diubah!');
     }
 
-    // 5. Engine Checkout Transaksi (Cash & Online Payment) + Generate AI Token
     public function checkout(Request $request)
     {
         $validated = $request->validate([
@@ -191,6 +201,7 @@ class PosController extends Controller
             'table_id' => 'nullable|exists:tables,id',
             'order_type' => 'required|in:dine_in,takeaway,delivery',
             'payment_method' => 'required|in:cash,qris,va,ewallet',
+            'voucher_id' => 'nullable|exists:vouchers,id',
             'items' => 'required|array|min:1',
             'items.*.menu_id' => 'required|exists:menus,id',
             'items.*.qty' => 'required|integer|min:1',
@@ -226,6 +237,25 @@ class PosController extends Controller
                 }
             }
 
+            // Hitung potongan Voucher Promo jika ada
+            $discountTotal = 0;
+            if (!empty($validated['voucher_id'])) {
+                $voucher = Voucher::where('cafe_id', $cafeId)
+                    ->where('id', $validated['voucher_id'])
+                    ->where('is_active', true)
+                    ->first();
+
+                if ($voucher && $subtotal >= $voucher->min_order_amount && $voucher->used_count < $voucher->quota) {
+                    $discountTotal = $voucher->discount_type === 'percent'
+                        ? round(($subtotal * $voucher->discount_value) / 100)
+                        : min($subtotal, $voucher->discount_value);
+
+                    $voucher->increment('used_count');
+                }
+            }
+
+            $grandTotal = max(0, $subtotal - $discountTotal);
+
             $customer = null;
             if (!empty($validated['customer_phone'])) {
                 $customer = Customer::firstOrCreate(
@@ -248,7 +278,8 @@ class PosController extends Controller
                 'order_type' => $validated['order_type'],
                 'order_status' => 'paid',
                 'subtotal' => $subtotal,
-                'grand_total' => $subtotal,
+                'discount_total' => $discountTotal,
+                'grand_total' => $grandTotal,
             ]);
 
             $order->items()->createMany($orderItemsData);
@@ -257,7 +288,7 @@ class PosController extends Controller
                 'order_id' => $order->id,
                 'payment_method' => $validated['payment_method'],
                 'payment_status' => 'paid',
-                'amount_paid' => $subtotal,
+                'amount_paid' => $grandTotal,
                 'paid_at' => now(),
             ]);
 
@@ -271,13 +302,12 @@ class PosController extends Controller
             ]);
 
             return back()->with([
-                'success' => "Order #{$order->queue_number} berhasil! Saldo Shift Kasir & Stok otomatis diperbarui.",
+                'success' => "Order #{$order->queue_number} berhasil! " . ($discountTotal > 0 ? "Hemat Rp " . number_format($discountTotal, 0, ',', '.') : ""),
                 'ai_token' => $aiToken->token_code,
             ]);
         });
     }
 
-    // 6. Validasi Pembayaran Tunai (Cash) dari Pelanggan Scan QR -> Terbitkan Token AI
     public function approveCashOrder($orderId)
     {
         return DB::transaction(function () use ($orderId) {

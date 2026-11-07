@@ -47,6 +47,7 @@ Route::middleware(['auth', 'role:owner,cashier,barista'])->group(function () {
     Route::post('/pos/shift/open', [PosController::class, 'openShift'])->name('pos.shift.open');
     Route::post('/pos/shift/close', [PosController::class, 'closeShift'])->name('pos.shift.close');
 
+    // Route Manajemen Operasional, Voucher Promo, & Member CRM
     Route::get('/management', [ManagementController::class, 'index'])->name('management.index');
     Route::post('/management/stocks', [ManagementController::class, 'storeStock'])->name('management.stocks.store');
     Route::post('/management/stocks/{stock}/restock', [ManagementController::class, 'restock'])->name('management.stocks.restock');
@@ -57,6 +58,9 @@ Route::middleware(['auth', 'role:owner,cashier,barista'])->group(function () {
     Route::post('/management/orders/{order}/status', [ManagementController::class, 'updateOrderStatus'])->name('management.orders.status');
     Route::post('/management/orders/{order}/driver', [ManagementController::class, 'assignDriver'])->name('management.orders.driver');
     Route::post('/management/staffs', [ManagementController::class, 'storeStaff'])->name('management.staffs.store');
+    Route::post('/management/vouchers', [ManagementController::class, 'storeVoucher'])->name('management.vouchers.store');
+    Route::post('/management/vouchers/{voucher}/toggle', [ManagementController::class, 'toggleVoucher'])->name('management.vouchers.toggle');
+    Route::delete('/management/vouchers/{voucher}', [ManagementController::class, 'destroyVoucher'])->name('management.vouchers.destroy');
 });
 
 // 6. Grup Route Profile Bawaan Laravel Breeze

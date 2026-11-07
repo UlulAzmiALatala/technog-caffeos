@@ -9,14 +9,17 @@ import {
     Bot,
     Send,
     Sparkles,
-    Users,
+    BarChart3,
+    Award,
+    Wallet,
 } from "lucide-react";
 
 export default function OwnerDashboard({
     metrics,
-    lowStocks,
+    revenueChart = [],
+    topMenus = [],
+    shiftAudits = [],
     recentOrders,
-    staffs,
     templates,
     tables,
     ownerChatLogs,
@@ -39,6 +42,9 @@ export default function OwnerDashboard({
         ? "bg-white border border-amber-200 text-stone-800 shadow-sm"
         : "bg-slate-900/80 border border-slate-800 text-slate-100";
 
+    const maxRevenue = Math.max(...revenueChart.map((d) => d.revenue), 1);
+    const maxMenuQty = Math.max(...topMenus.map((m) => Number(m.total_qty)), 1);
+
     return (
         <CaffeOSLayout templates={templates} tables={tables}>
             <Head title="Owner Super Admin & AI - TechnoG CaffeOS" />
@@ -53,7 +59,7 @@ export default function OwnerDashboard({
                             Super Admin Executive Lounge
                         </span>
                         <h1 className="text-2xl font-bold mt-0.5">
-                            Monitoring Bisnis & AI Co-Worker for Owner
+                            Monitoring Bisnis, Grafik Analitik & AI Co-Worker
                         </h1>
                     </div>
 
@@ -66,7 +72,7 @@ export default function OwnerDashboard({
                     </a>
                 </div>
 
-                {/* 4 Kartu Indikator Utama (MONITORING) */}
+                {/* 4 Kartu Indikator Utama */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div className={`p-5 rounded-2xl ${cardClass}`}>
                         <div className="flex justify-between items-center text-xs opacity-70">
@@ -115,7 +121,118 @@ export default function OwnerDashboard({
                     </div>
                 </div>
 
-                {/* Grid Utama: AI Co-Worker for Owner (Kiri) & Tabel Monitoring Transaksi/Staf (Kanan) */}
+                {/* Baris Visualisasi Grafik: Grafik Batang Omzet 7 Hari & Leaderboard Menu Terlaris */}
+                <div className="grid grid-cols-12 gap-6">
+                    {/* Grafik Tren Omzet 7 Hari Terakhir */}
+                    <div
+                        className={`col-span-12 lg:col-span-7 p-6 rounded-2xl ${cardClass}`}
+                    >
+                        <div className="flex items-center justify-between mb-6">
+                            <div>
+                                <h2 className="font-bold text-base flex items-center gap-2">
+                                    <BarChart3 className="w-5 h-5 text-emerald-500" />{" "}
+                                    Grafik Tren Omzet 7 Hari Terakhir
+                                </h2>
+                                <p className="text-xs opacity-70">
+                                    Visualisasi pendapatan harian kafe secara
+                                    real-time
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="h-52 flex items-end justify-between gap-3 pt-6 px-2 border-b border-slate-700/30 pb-2">
+                            {revenueChart.map((day, idx) => {
+                                const heightPercent = Math.max(
+                                    8,
+                                    Math.round(
+                                        (day.revenue / maxRevenue) * 100,
+                                    ),
+                                );
+                                return (
+                                    <div
+                                        key={idx}
+                                        className="flex-1 flex flex-col items-center gap-2 group"
+                                    >
+                                        <span className="text-[10px] font-mono font-bold text-emerald-400 opacity-80 group-hover:opacity-100">
+                                            {day.revenue > 0
+                                                ? `Rp ${(day.revenue / 1000).toFixed(0)}k`
+                                                : "Rp 0"}
+                                        </span>
+                                        <div className="w-full h-36 flex items-end justify-center bg-slate-800/30 rounded-xl p-1">
+                                            <div
+                                                style={{
+                                                    height: `${heightPercent}%`,
+                                                }}
+                                                className="w-full rounded-lg bg-gradient-to-t from-emerald-600 to-emerald-400 transition-all duration-500"
+                                            />
+                                        </div>
+                                        <span className="text-[11px] font-bold opacity-75">
+                                            {day.label}
+                                        </span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {/* Leaderboard Top 5 Menu Terlaris */}
+                    <div
+                        className={`col-span-12 lg:col-span-5 p-6 rounded-2xl ${cardClass}`}
+                    >
+                        <h2 className="font-bold text-base flex items-center gap-2 mb-4">
+                            <Award className="w-5 h-5 text-amber-400" /> Top 5
+                            Menu Paling Laris
+                        </h2>
+                        <div className="space-y-3.5">
+                            {topMenus.length === 0 ? (
+                                <p className="text-xs opacity-60 py-10 text-center">
+                                    Belum ada data penjualan menu.
+                                </p>
+                            ) : (
+                                topMenus.map((item, idx) => {
+                                    const widthPercent = Math.max(
+                                        15,
+                                        Math.round(
+                                            (Number(item.total_qty) /
+                                                maxMenuQty) *
+                                                100,
+                                        ),
+                                    );
+                                    return (
+                                        <div
+                                            key={item.menu_id}
+                                            className="space-y-1"
+                                        >
+                                            <div className="flex justify-between text-xs font-bold">
+                                                <span>
+                                                    #{idx + 1}{" "}
+                                                    {item.menu?.name || "Menu"}
+                                                </span>
+                                                <span className="text-emerald-400">
+                                                    {item.total_qty} Terjual (Rp{" "}
+                                                    {Number(
+                                                        item.total_sales,
+                                                    ).toLocaleString("id-ID")}
+                                                    )
+                                                </span>
+                                            </div>
+                                            <div className="w-full h-2.5 rounded-full bg-slate-800/50 overflow-hidden">
+                                                <div
+                                                    style={{
+                                                        width: `${widthPercent}%`,
+                                                    }}
+                                                    className="h-full rounded-full bg-amber-400"
+                                                />
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Grid Bawah: AI Co-Worker for Owner (Kiri) & Audit Shift + Transaksi (Kanan) */}
                 <div className="grid grid-cols-12 gap-6">
                     {/* Panel AI CO-WORKER FOR OWNER */}
                     <div
@@ -137,19 +254,14 @@ export default function OwnerDashboard({
                                 </div>
                             </div>
 
-                            <div className="h-80 overflow-y-auto space-y-3 p-3 rounded-xl bg-slate-950/80 text-slate-100 border border-slate-800 mb-4">
+                            <div className="h-72 overflow-y-auto space-y-3 p-3 rounded-xl bg-slate-950/80 text-slate-100 border border-slate-800 mb-4">
                                 {ownerChatLogs.length === 0 && (
-                                    <div className="text-center py-12 px-4 space-y-2 text-xs text-slate-400">
+                                    <div className="text-center py-10 px-4 space-y-2 text-xs text-slate-400">
                                         <Sparkles className="w-6 h-6 text-purple-400 mx-auto" />
                                         <p>
                                             Halo Owner! Saya terhubung langsung
                                             dengan data omzet dan stok gudang
                                             Anda.
-                                        </p>
-                                        <p className="text-slate-500">
-                                            Coba tanya: "Bagaimana performa
-                                            omzet hari ini dan stok apa yang
-                                            harus dibeli?"
                                         </p>
                                     </div>
                                 )}
@@ -190,44 +302,120 @@ export default function OwnerDashboard({
                         </form>
                     </div>
 
-                    {/* Tabel Monitoring Transaksi & Akun Staf */}
+                    {/* Tabel Audit Laci Shift Kasir & Riwayat Transaksi */}
                     <div className="col-span-12 lg:col-span-7 space-y-6">
                         <div className={`p-6 rounded-2xl ${cardClass}`}>
-                            <h2 className="font-bold text-base mb-4">
+                            <h2 className="font-bold text-base mb-3 flex items-center gap-2">
+                                <Wallet className="w-4 h-4 text-emerald-500" />{" "}
+                                Audit Rekonsiliasi Laci Shift Kasir
+                            </h2>
+                            <div className="overflow-x-auto max-h-48">
+                                <table className="w-full text-xs text-left">
+                                    <thead className="uppercase opacity-60 border-b border-slate-700/30">
+                                        <tr>
+                                            <th className="py-2">Kasir</th>
+                                            <th className="py-2">Modal Awal</th>
+                                            <th className="py-2">Seharusnya</th>
+                                            <th className="py-2">
+                                                Fisik Aktual
+                                            </th>
+                                            <th className="py-2 text-right">
+                                                Selisih / Status
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-700/20">
+                                        {shiftAudits.map((sh) => (
+                                            <tr key={sh.id}>
+                                                <td className="py-2 font-bold">
+                                                    {sh.user?.name}
+                                                </td>
+                                                <td className="py-2">
+                                                    Rp{" "}
+                                                    {Number(
+                                                        sh.opening_cash,
+                                                    ).toLocaleString("id-ID")}
+                                                </td>
+                                                <td className="py-2">
+                                                    Rp{" "}
+                                                    {Number(
+                                                        sh.expected_cash,
+                                                    ).toLocaleString("id-ID")}
+                                                </td>
+                                                <td className="py-2">
+                                                    {sh.actual_cash !== null
+                                                        ? `Rp ${Number(sh.actual_cash).toLocaleString("id-ID")}`
+                                                        : "-"}
+                                                </td>
+                                                <td className="py-2 text-right font-bold">
+                                                    {sh.status === "open" ? (
+                                                        <span className="text-emerald-400">
+                                                            SHIFT AKTIF
+                                                        </span>
+                                                    ) : Number(
+                                                          sh.difference,
+                                                      ) === 0 ? (
+                                                        <span className="text-emerald-400">
+                                                            BALANCE
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-red-400">
+                                                            Rp{" "}
+                                                            {Number(
+                                                                sh.difference,
+                                                            ).toLocaleString(
+                                                                "id-ID",
+                                                            )}
+                                                        </span>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div className={`p-6 rounded-2xl ${cardClass}`}>
+                            <h2 className="font-bold text-base mb-3">
                                 Riwayat Transaksi Real-Time
                             </h2>
-                            <div className="overflow-x-auto max-h-64">
+                            <div className="overflow-x-auto max-h-56">
                                 <table className="w-full text-xs text-left">
                                     <thead className="uppercase opacity-60 border-b border-slate-700/30">
                                         <tr>
                                             <th className="py-2">Antrean</th>
                                             <th className="py-2">Pelanggan</th>
                                             <th className="py-2">Metode</th>
-                                            <th className="py-2">Status</th>
+                                            <th className="py-2">Diskon</th>
                                             <th className="py-2 text-right">
-                                                Total
+                                                Grand Total
                                             </th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-700/20">
                                         {recentOrders.map((ord) => (
                                             <tr key={ord.id}>
-                                                <td className="py-2.5 font-bold text-emerald-500">
+                                                <td className="py-2 font-bold text-emerald-500">
                                                     #{ord.queue_number}
                                                 </td>
-                                                <td className="py-2.5">
+                                                <td className="py-2">
                                                     {ord.customer_name}
                                                 </td>
-                                                <td className="py-2.5 uppercase">
+                                                <td className="py-2 uppercase">
                                                     {
                                                         ord.payment
                                                             ?.payment_method
                                                     }
                                                 </td>
-                                                <td className="py-2.5 uppercase font-semibold">
-                                                    {ord.order_status}
+                                                <td className="py-2 text-purple-400">
+                                                    {Number(
+                                                        ord.discount_total,
+                                                    ) > 0
+                                                        ? `-Rp ${Number(ord.discount_total).toLocaleString("id-ID")}`
+                                                        : "-"}
                                                 </td>
-                                                <td className="py-2.5 text-right font-bold">
+                                                <td className="py-2 text-right font-bold">
                                                     Rp{" "}
                                                     {Number(
                                                         ord.grand_total,
@@ -237,28 +425,6 @@ export default function OwnerDashboard({
                                         ))}
                                     </tbody>
                                 </table>
-                            </div>
-                        </div>
-
-                        {/* Daftar Staf Aktif (Owner, Cashier, Barista) */}
-                        <div className={`p-6 rounded-2xl ${cardClass}`}>
-                            <h2 className="font-bold text-base mb-3 flex items-center gap-2">
-                                <Users className="w-4 h-4 text-emerald-500" />{" "}
-                                Daftar Akun Role Internal Kafe
-                            </h2>
-                            <div className="grid grid-cols-3 gap-3">
-                                {staffs.map((st) => (
-                                    <div
-                                        key={st.id}
-                                        className="p-3 rounded-xl bg-slate-950/40 border border-slate-700/30 text-xs"
-                                    >
-                                        <p className="font-bold">{st.name}</p>
-                                        <p className="opacity-70">{st.email}</p>
-                                        <span className="inline-block mt-1.5 px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 uppercase font-bold text-[10px]">
-                                            Role: {st.role}
-                                        </span>
-                                    </div>
-                                ))}
                             </div>
                         </div>
                     </div>

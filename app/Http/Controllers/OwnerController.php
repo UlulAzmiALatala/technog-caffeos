@@ -4,13 +4,16 @@ namespace App\Http\Controllers;
 
 use App\Models\AiChatLog;
 use App\Models\AiToken;
+use App\Models\CashierShift;
 use App\Models\DiningTable;
 use App\Models\Menu;
 use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\Stock;
 use App\Models\Template;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -22,14 +25,39 @@ class OwnerController extends Controller
     {
         $cafeId = $request->user()->cafe_id;
 
-        // 1. Data Monitoring Omzet & Operasional
         $paidOrders = Order::where('cafe_id', $cafeId)->whereIn('order_status', ['paid', 'processing', 'ready', 'completed']);
         $totalRevenue = (clone $paidOrders)->sum('grand_total');
         $todayRevenue = (clone $paidOrders)->whereDate('created_at', today())->sum('grand_total');
         $totalOrdersCount = Order::where('cafe_id', $cafeId)->count();
         $lowStocks = Stock::where('cafe_id', $cafeId)->whereColumn('current_qty', '<=', 'min_qty_alert')->get();
 
-        // 2. Pastikan Owner Memiliki Token Khusus untuk "AI Co-Worker for Owner"
+        // 1. Data Grafik Tren Omzet 7 Hari Terakhir
+        $revenueChart = [];
+        for ($i = 6; $i >= 0; $i--) {
+            $date = today()->subDays($i);
+            $dayTotal = Order::where('cafe_id', $cafeId)
+                ->whereIn('order_status', ['paid', 'processing', 'ready', 'completed'])
+                ->whereDate('created_at', $date)
+                ->sum('grand_total');
+
+            $revenueChart[] = [
+                'label' => $date->format('d M'),
+                'revenue' => (float) $dayTotal,
+            ];
+        }
+
+        // 2. Data Grafik Top 5 Menu Terlaris
+        $topMenus = OrderItem::select('menu_id', DB::raw('SUM(qty) as total_qty'), DB::raw('SUM(subtotal) as total_sales'))
+            ->whereHas('order', function ($q) use ($cafeId) {
+                $q->where('cafe_id', $cafeId)->where('order_status', '!=', 'pending');
+            })
+            ->with('menu:id,name,category')
+            ->groupBy('menu_id')
+            ->orderByDesc('total_qty')
+            ->take(5)
+            ->get();
+
+        // 3. Token Khusus "AI Co-Worker for Owner"
         $ownerToken = AiToken::firstOrCreate(
             [
                 'cafe_id' => $cafeId,
@@ -52,6 +80,9 @@ class OwnerController extends Controller
                 'total_orders' => $totalOrdersCount,
                 'low_stock_count' => $lowStocks->count(),
             ],
+            'revenueChart' => $revenueChart,
+            'topMenus' => $topMenus,
+            'shiftAudits' => CashierShift::with('user')->where('cafe_id', $cafeId)->latest()->take(8)->get(),
             'lowStocks' => $lowStocks,
             'recentOrders' => Order::with(['items.menu', 'payment', 'cashier'])
                 ->where('cafe_id', $cafeId)
@@ -65,7 +96,6 @@ class OwnerController extends Controller
         ]);
     }
 
-    // Fitur AI CO-WORKER FOR OWNER (Menganalisis Omzet & Stok Kafe secara Real-Time)
     public function askOwnerAi(Request $request)
     {
         $request->validate(['prompt' => 'required|string|max:500']);
@@ -77,7 +107,6 @@ class OwnerController extends Controller
             ->where('token_type', 'owner_assistant')
             ->firstOrFail();
 
-        // Kumpulkan data bisnis aktual kafe sebagai konteks AI Owner
         $totalRevenue = Order::where('cafe_id', $cafeId)->where('order_status', '!=', 'pending')->sum('grand_total');
         $orderCount = Order::where('cafe_id', $cafeId)->count();
         $stocksSummary = Stock::where('cafe_id', $cafeId)->get()->map(fn($s) => "{$s->name}: {$s->current_qty} {$s->unit}")->implode(', ');
@@ -86,7 +115,7 @@ class OwnerController extends Controller
         $businessContext = "Total Omzet: Rp " . number_format($totalRevenue, 0, ',', '.') .
             " dari {$orderCount} transaksi. Status Stok Gudang: [{$stocksSummary}]. Daftar Menu: [{$menusSummary}].";
 
-        $reply = "Berdasarkan data real-time {$user->cafe->name} saat ini ({$businessContext}), saran strategis untuk pertanyaan Anda \"{$request->prompt}\": Pastikan bahan baku dengan stok rendah segera di-restock dan promosikan paket bundling kopi pada jam sibuk untuk mendongkrak rata-rata nilai transaksi.";
+        $reply = "Berdasarkan data real-time {$user->cafe->name} saat ini ({$businessContext}), saran strategis untuk pertanyaan Anda \"{$request->prompt}\": Pastikan bahan baku dengan stok rendah segera di-restock dan manfaatkan fitur Voucher Promo (seperti HEMAT20) pada jam sepi untuk meningkatkan volume transaksi.";
 
         if (env('GEMINI_API_KEY')) {
             try {
@@ -99,7 +128,6 @@ class OwnerController extends Controller
                 ]);
                 $reply = $response->json('candidates.0.content.parts.0.text') ?? $reply;
             } catch (\Exception $e) {
-                // Gunakan fallback lokal jika API tidak terjangkau
             }
         }
 
@@ -114,7 +142,6 @@ class OwnerController extends Controller
         return back();
     }
 
-    // Fitur EXPORT Laporan Transaksi ke CSV/Excel (Sesuai Flowchart Owner)
     public function exportCsv(Request $request): StreamedResponse
     {
         $cafeId = $request->user()->cafe_id;
@@ -127,7 +154,7 @@ class OwnerController extends Controller
 
         return response()->stream(function () use ($orders) {
             $handle = fopen('php://output', 'w');
-            fputcsv($handle, ['Kode Order', 'Antrean', 'Tanggal', 'Nama Pelanggan', 'Tipe Order', 'Metode Bayar', 'Status', 'Grand Total (Rp)']);
+            fputcsv($handle, ['Kode Order', 'Antrean', 'Tanggal', 'Nama Pelanggan', 'Tipe Order', 'Metode Bayar', 'Diskon (Rp)', 'Grand Total (Rp)']);
 
             foreach ($orders as $ord) {
                 fputcsv($handle, [
@@ -137,7 +164,7 @@ class OwnerController extends Controller
                     $ord->customer_name,
                     strtoupper($ord->order_type),
                     strtoupper($ord->payment?->payment_method ?? '-'),
-                    strtoupper($ord->order_status),
+                    $ord->discount_total,
                     $ord->grand_total,
                 ]);
             }

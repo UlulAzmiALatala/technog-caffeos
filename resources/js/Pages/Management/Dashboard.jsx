@@ -13,6 +13,8 @@ import {
     ChefHat,
     Truck,
     Printer,
+    Ticket,
+    HeartHandshake,
 } from "lucide-react";
 
 export default function ManagementDashboard({
@@ -21,14 +23,16 @@ export default function ManagementDashboard({
     tables,
     templates,
     staffs = [],
+    vouchers = [],
+    customers = [],
     orders,
 }) {
     const { auth } = usePage().props;
     const isWood = auth.activeTemplate === "minimalist-wood";
-    const [activeTab, setActiveTab] = useState("orders"); // orders | menus | stocks | tables | staffs
+    const [activeTab, setActiveTab] = useState("orders");
     const [selectedQrTable, setSelectedQrTable] = useState(null);
 
-    // State Form Input Menu Baru + Komposisi Resep Stok
+    // State Form Input Menu Baru
     const [menuForm, setMenuForm] = useState({
         name: "",
         category: "Coffee",
@@ -61,6 +65,16 @@ export default function ManagementDashboard({
         phone: "",
         role: "barista",
         password: "",
+    });
+
+    // State Form Input Voucher Promo Baru
+    const [voucherForm, setVoucherForm] = useState({
+        code: "",
+        name: "",
+        discount_type: "percent",
+        discount_value: "",
+        min_order_amount: 0,
+        quota: 50,
     });
 
     // State Penugasan Driver Delivery per Order
@@ -149,6 +163,21 @@ export default function ManagementDashboard({
         });
     };
 
+    const handleVoucherSubmit = (e) => {
+        e.preventDefault();
+        router.post(route("management.vouchers.store"), voucherForm, {
+            onSuccess: () =>
+                setVoucherForm({
+                    code: "",
+                    name: "",
+                    discount_type: "percent",
+                    discount_value: "",
+                    min_order_amount: 0,
+                    quota: 50,
+                }),
+        });
+    };
+
     const handleAssignDriver = (orderId) => {
         const data = driverData[orderId];
         if (!data?.driver_name || !data?.recipient_address) return;
@@ -157,35 +186,45 @@ export default function ManagementDashboard({
 
     return (
         <CaffeOSLayout templates={templates} tables={tables}>
-            <Head title="Operasional Dapur, Menu & Stok - TechnoG CaffeOS" />
+            <Head title="Operasional Dapur, Menu & Promo - TechnoG CaffeOS" />
 
             <div className="max-w-7xl mx-auto p-6 space-y-6">
-                {/* Bar Navigasi Sub-Fitur Operasional */}
-                <div className="flex flex-wrap gap-2.5 border-b border-slate-700/30 pb-4">
+                {/* Bar Navigasi 7 Sub-Fitur Operasional & Manajemen */}
+                <div className="flex flex-wrap gap-2 border-b border-slate-700/30 pb-4">
                     {[
                         {
                             id: "orders",
-                            label: `1. MANAGE ORDER DAPUR (${orders.length})`,
+                            label: `1. DAPUR ORDER (${orders.length})`,
                             icon: ClipboardList,
                         },
                         {
                             id: "menus",
-                            label: `2. INPUT MENU & RESEP (${menus.length})`,
+                            label: `2. MENU & RESEP (${menus.length})`,
                             icon: Coffee,
                         },
                         {
                             id: "stocks",
-                            label: `3. MONITOR STOCK (${stocks.length})`,
+                            label: `3. STOK GUDANG (${stocks.length})`,
                             icon: Package,
                         },
                         {
+                            id: "vouchers",
+                            label: `4. PROMO VOUCHER (${vouchers.length})`,
+                            icon: Ticket,
+                        },
+                        {
+                            id: "customers",
+                            label: `5. MEMBER CRM (${customers.length})`,
+                            icon: HeartHandshake,
+                        },
+                        {
                             id: "tables",
-                            label: `4. MEJA & CETAK QR (${tables.length})`,
+                            label: `6. MEJA & QR (${tables.length})`,
                             icon: QrCode,
                         },
                         {
                             id: "staffs",
-                            label: `5. AKUN KARYAWAN (${staffs.length})`,
+                            label: `7. KARYAWAN (${staffs.length})`,
                             icon: Users,
                         },
                     ].map((tab) => {
@@ -195,7 +234,7 @@ export default function ManagementDashboard({
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
-                                className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition ${
+                                className={`px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition ${
                                     isActive
                                         ? isWood
                                             ? "bg-amber-900 text-white shadow"
@@ -257,7 +296,6 @@ export default function ManagementDashboard({
                                         ))}
                                     </ul>
 
-                                    {/* Panel Khusus Pesanan Bertipe DELIVERY (Tabel Deliveries / Driver) */}
                                     {ord.order_type === "delivery" && (
                                         <div className="mt-3 p-3 rounded-xl border border-blue-500/30 bg-blue-500/10 space-y-2 text-xs">
                                             <div className="font-bold text-blue-400 flex items-center gap-1">
@@ -360,7 +398,6 @@ export default function ManagementDashboard({
                                     )}
                                 </div>
 
-                                {/* Tombol Status Dapur Proses -> Siap Saji -> Selesai */}
                                 <div className="grid grid-cols-3 gap-2 pt-2">
                                     <button
                                         onClick={() =>
@@ -797,7 +834,293 @@ export default function ManagementDashboard({
                     </div>
                 )}
 
-                {/* ================= TAB 4: KELOLA MEJA & CETAK QR VISUAL ================= */}
+                {/* ================= TAB 4: PROMO VOUCHER & DISKON ================= */}
+                {activeTab === "vouchers" && (
+                    <div className="grid grid-cols-12 gap-6">
+                        <form
+                            onSubmit={handleVoucherSubmit}
+                            className={`col-span-12 lg:col-span-4 p-6 rounded-2xl space-y-4 h-fit ${cardClass}`}
+                        >
+                            <h2 className="font-bold text-base text-emerald-500 border-b border-slate-700/20 pb-2">
+                                + Buat Kode Voucher Promo
+                            </h2>
+                            <div>
+                                <label className="text-xs opacity-70">
+                                    Kode Voucher (Huruf Kapital) *
+                                </label>
+                                <input
+                                    type="text"
+                                    required
+                                    placeholder="Contoh: HEMAT20 atau KOPI10RB"
+                                    value={voucherForm.code}
+                                    onChange={(e) =>
+                                        setVoucherForm({
+                                            ...voucherForm,
+                                            code: e.target.value.toUpperCase(),
+                                        })
+                                    }
+                                    className={`w-full mt-1 font-mono uppercase ${inputClass}`}
+                                />
+                            </div>
+                            <div>
+                                <label className="text-xs opacity-70">
+                                    Nama Program Promo *
+                                </label>
+                                <input
+                                    type="text"
+                                    required
+                                    placeholder="Diskon Spesial Akhir Pekan"
+                                    value={voucherForm.name}
+                                    onChange={(e) =>
+                                        setVoucherForm({
+                                            ...voucherForm,
+                                            name: e.target.value,
+                                        })
+                                    }
+                                    className={`w-full mt-1 ${inputClass}`}
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className="text-xs opacity-70">
+                                        Tipe Diskon
+                                    </label>
+                                    <select
+                                        value={voucherForm.discount_type}
+                                        onChange={(e) =>
+                                            setVoucherForm({
+                                                ...voucherForm,
+                                                discount_type: e.target.value,
+                                            })
+                                        }
+                                        className={`w-full mt-1 ${inputClass}`}
+                                    >
+                                        <option value="percent">
+                                            Persentase (%)
+                                        </option>
+                                        <option value="fixed">
+                                            Nominal Tetap (Rp)
+                                        </option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-xs opacity-70">
+                                        Nilai Diskon *
+                                    </label>
+                                    <input
+                                        type="number"
+                                        required
+                                        placeholder={
+                                            voucherForm.discount_type ===
+                                            "percent"
+                                                ? "20"
+                                                : "10000"
+                                        }
+                                        value={voucherForm.discount_value}
+                                        onChange={(e) =>
+                                            setVoucherForm({
+                                                ...voucherForm,
+                                                discount_value: e.target.value,
+                                            })
+                                        }
+                                        className={`w-full mt-1 ${inputClass}`}
+                                    />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className="text-xs opacity-70">
+                                        Min. Belanja (Rp)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        value={voucherForm.min_order_amount}
+                                        onChange={(e) =>
+                                            setVoucherForm({
+                                                ...voucherForm,
+                                                min_order_amount:
+                                                    e.target.value,
+                                            })
+                                        }
+                                        className={`w-full mt-1 ${inputClass}`}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs opacity-70">
+                                        Kuota Pemakaian
+                                    </label>
+                                    <input
+                                        type="number"
+                                        required
+                                        value={voucherForm.quota}
+                                        onChange={(e) =>
+                                            setVoucherForm({
+                                                ...voucherForm,
+                                                quota: e.target.value,
+                                            })
+                                        }
+                                        className={`w-full mt-1 ${inputClass}`}
+                                    />
+                                </div>
+                            </div>
+                            <button
+                                type="submit"
+                                className="w-full py-3 rounded-xl bg-emerald-500 text-slate-950 font-bold text-sm"
+                            >
+                                Terbitkan Voucher Promo
+                            </button>
+                        </form>
+
+                        <div className="col-span-12 lg:col-span-8 grid grid-cols-1 md:grid-cols-2 gap-4 h-fit">
+                            {vouchers.length === 0 && (
+                                <p className="col-span-2 text-center py-12 text-xs opacity-60">
+                                    Belum ada voucher promo. Buat voucher di
+                                    sebelah kiri agar muncul di layar Kasir POS!
+                                </p>
+                            )}
+                            {vouchers.map((v) => (
+                                <div
+                                    key={v.id}
+                                    className={`p-5 rounded-2xl flex justify-between items-center ${cardClass}`}
+                                >
+                                    <div className="space-y-1">
+                                        <span className="px-3 py-1 rounded-lg bg-purple-500/20 border border-purple-500/40 text-purple-300 font-mono font-extrabold text-sm">
+                                            🏷️ {v.code}
+                                        </span>
+                                        <h3 className="font-bold text-sm pt-1">
+                                            {v.name}
+                                        </h3>
+                                        <p className="text-xs text-emerald-400 font-bold">
+                                            Potongan:{" "}
+                                            {v.discount_type === "percent"
+                                                ? `${Number(v.discount_value)}%`
+                                                : `Rp ${Number(v.discount_value).toLocaleString("id-ID")}`}
+                                        </p>
+                                        <p className="text-[11px] opacity-70">
+                                            Min. Order: Rp{" "}
+                                            {Number(
+                                                v.min_order_amount,
+                                            ).toLocaleString("id-ID")}{" "}
+                                            • Terpakai: {v.used_count}/{v.quota}
+                                        </p>
+                                    </div>
+                                    <div className="flex flex-col items-end gap-2">
+                                        <button
+                                            onClick={() =>
+                                                router.post(
+                                                    route(
+                                                        "management.vouchers.toggle",
+                                                        v.id,
+                                                    ),
+                                                )
+                                            }
+                                            className={`px-3 py-1 rounded-lg text-xs font-bold ${
+                                                v.is_active
+                                                    ? "bg-emerald-500/20 text-emerald-400"
+                                                    : "bg-red-500/20 text-red-400"
+                                            }`}
+                                        >
+                                            {v.is_active ? "Aktif" : "Nonaktif"}
+                                        </button>
+                                        <button
+                                            onClick={() =>
+                                                router.delete(
+                                                    route(
+                                                        "management.vouchers.destroy",
+                                                        v.id,
+                                                    ),
+                                                )
+                                            }
+                                            className="p-1.5 rounded-lg bg-red-500/10 text-red-400"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* ================= TAB 5: MEMBER PELANGGAN (CRM) ================= */}
+                {activeTab === "customers" && (
+                    <div className={`p-6 rounded-2xl ${cardClass}`}>
+                        <div className="flex justify-between items-center mb-4">
+                            <div>
+                                <h2 className="font-bold text-lg text-emerald-500">
+                                    Database Member & Loyalitas Pelanggan (CRM)
+                                </h2>
+                                <p className="text-xs opacity-70">
+                                    Otomatis tercatat setiap kali kasir
+                                    menginput Nomor WhatsApp pelanggan saat
+                                    checkout.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-xs text-left">
+                                <thead className="uppercase opacity-60 border-b border-slate-700/30">
+                                    <tr>
+                                        <th className="py-3">Kode Member</th>
+                                        <th className="py-3">Nama Pelanggan</th>
+                                        <th className="py-3">Nomor WhatsApp</th>
+                                        <th className="py-3">
+                                            Total Kunjungan
+                                        </th>
+                                        <th className="py-3 text-right">
+                                            Total Nilai Belanja
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-700/20">
+                                    {customers.length === 0 ? (
+                                        <tr>
+                                            <td
+                                                colSpan="5"
+                                                className="py-8 text-center opacity-60"
+                                            >
+                                                Belum ada data member. Masukkan
+                                                nomor WhatsApp pelanggan saat
+                                                transaksi di Kasir POS untuk
+                                                mendaftarkan member otomatis.
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        customers.map((c) => (
+                                            <tr key={c.id}>
+                                                <td className="py-3 font-mono font-bold text-purple-400">
+                                                    {c.member_code}
+                                                </td>
+                                                <td className="py-3 font-bold">
+                                                    {c.name}
+                                                </td>
+                                                <td className="py-3">
+                                                    {c.phone}
+                                                </td>
+                                                <td className="py-3">
+                                                    <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold">
+                                                        {c.orders_count}x
+                                                        Transaksi
+                                                    </span>
+                                                </td>
+                                                <td className="py-3 text-right font-extrabold text-emerald-500">
+                                                    Rp{" "}
+                                                    {Number(
+                                                        c.orders_sum_grand_total ||
+                                                            0,
+                                                    ).toLocaleString("id-ID")}
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
+
+                {/* ================= TAB 6: KELOLA MEJA & CETAK QR VISUAL ================= */}
                 {activeTab === "tables" && (
                     <div className="grid grid-cols-12 gap-6">
                         <form
@@ -863,7 +1186,6 @@ export default function ManagementDashboard({
                                             </span>
                                         </div>
 
-                                        {/* Gambar Visual QR Code Siap Scan / Cetak */}
                                         <div className="p-3 bg-white rounded-xl inline-block mx-auto shadow-inner">
                                             <img
                                                 src={qrImageUrl}
@@ -907,7 +1229,7 @@ export default function ManagementDashboard({
                     </div>
                 )}
 
-                {/* ================= TAB 5: KELOLA AKUN KARYAWAN (BARISTA & CASHIER) ================= */}
+                {/* ================= TAB 7: KELOLA AKUN KARYAWAN ================= */}
                 {activeTab === "staffs" && (
                     <div className="grid grid-cols-12 gap-6">
                         <form
@@ -933,7 +1255,7 @@ export default function ManagementDashboard({
                             <input
                                 type="email"
                                 required
-                                placeholder="Email Login (Misal: barista2@technog.id)"
+                                placeholder="Email Login"
                                 value={staffForm.email}
                                 onChange={(e) =>
                                     setStaffForm({
@@ -1020,7 +1342,6 @@ export default function ManagementDashboard({
                 )}
             </div>
 
-            {/* Modal Cetak Stiker QR Code Meja */}
             {selectedQrTable && (
                 <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
                     <div className="bg-white text-slate-950 p-8 rounded-3xl max-w-sm w-full text-center space-y-4">

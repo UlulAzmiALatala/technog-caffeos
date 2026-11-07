@@ -8,12 +8,13 @@ import NeoBrutalCashier from "@/Templates/NeoBrutal/CashierView";
 import ReceiptModal from "@/Components/ReceiptModal";
 import QrisPaymentModal from "@/Components/QrisPaymentModal";
 import ShiftModal from "@/Components/ShiftModal";
-import { Wallet, Lock, Unlock } from "lucide-react";
+import { Wallet, Lock, Unlock, Ticket, X } from "lucide-react";
 
 export default function Workspace({
     menus,
     tables,
     templates,
+    vouchers = [],
     recentOrders,
     activeShift,
     shiftStats,
@@ -27,16 +28,17 @@ export default function Workspace({
         tableId,
         orderType,
         paymentMethod,
+        appliedVoucher,
+        setAppliedVoucher,
+        getDiscountAmount,
         getTotal,
         clearCart,
     } = useCartStore();
 
     const [selectedOrderReceipt, setSelectedOrderReceipt] = useState(null);
     const [showQrisModal, setShowQrisModal] = useState(false);
-    // Jika belum ada shift yang dibuka, otomatis buka modal Shift
     const [showShiftModal, setShowShiftModal] = useState(!activeShift);
 
-    // Eksekusi pengiriman data transaksi ke Backend
     const submitTransaction = () => {
         router.post(
             route("pos.checkout"),
@@ -46,6 +48,7 @@ export default function Workspace({
                 table_id: tableId || null,
                 order_type: orderType,
                 payment_method: paymentMethod,
+                voucher_id: appliedVoucher?.id || null,
                 items: cart,
             },
             {
@@ -57,7 +60,6 @@ export default function Workspace({
         );
     };
 
-    // Cegah transaksi jika Shift Kasir belum dibuka
     const handleCheckout = () => {
         if (!activeShift) {
             setShowShiftModal(true);
@@ -90,7 +92,6 @@ export default function Workspace({
         router.post(route("pos.approve-cash", orderId));
     };
 
-    // Resolver 3 Pilihan Template Kasir
     const templateMap = {
         "cyber-dark": CyberDarkCashier,
         "minimalist-wood": MinimalistWoodCashier,
@@ -107,7 +108,7 @@ export default function Workspace({
         <CaffeOSLayout templates={templates} tables={tables}>
             <Head title="POS Workspace - TechnoG CaffeOS" />
 
-            {/* Bar Status Shift Kasir & Petty Cash Real-Time */}
+            {/* Bar 1: Status Shift Kasir & Petty Cash Real-Time */}
             <div className="bg-slate-900 border-b border-slate-800 px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-200">
                 {activeShift ? (
                     <>
@@ -179,7 +180,52 @@ export default function Workspace({
                 )}
             </div>
 
-            {/* Bar Notifikasi Validasi Pembayaran Tunai (Cash) dari Pelanggan Scan QR */}
+            {/* Bar 2: Pilihan Cepat Voucher Promo Diskon (Otomatis Memotong Harga di Semua Template) */}
+            {vouchers.length > 0 && (
+                <div className="bg-slate-950 border-b border-slate-800/80 px-6 py-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-purple-300 font-bold flex items-center gap-1">
+                            <Ticket className="w-3.5 h-3.5" /> Pakai Voucher
+                            Promo:
+                        </span>
+                        {vouchers.map((v) => {
+                            const isSelected = appliedVoucher?.id === v.id;
+                            return (
+                                <button
+                                    key={v.id}
+                                    type="button"
+                                    onClick={() =>
+                                        setAppliedVoucher(isSelected ? null : v)
+                                    }
+                                    className={`px-2.5 py-1 rounded-lg font-mono font-bold transition flex items-center gap-1 ${
+                                        isSelected
+                                            ? "bg-purple-600 text-white shadow"
+                                            : "bg-slate-900 border border-purple-500/30 text-purple-300 hover:bg-purple-500/20"
+                                    }`}
+                                >
+                                    🏷️ {v.code} (
+                                    {v.discount_type === "percent"
+                                        ? `-${Number(v.discount_value)}%`
+                                        : `-Rp ${Number(v.discount_value).toLocaleString("id-ID")}`}
+                                    )
+                                    {isSelected && (
+                                        <X className="w-3 h-3 ml-1" />
+                                    )}
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    {appliedVoucher && (
+                        <span className="text-emerald-400 font-bold">
+                            ✨ Voucher {appliedVoucher.code} Aktif: Hemat Rp{" "}
+                            {getDiscountAmount().toLocaleString("id-ID")}!
+                        </span>
+                    )}
+                </div>
+            )}
+
+            {/* Bar 3: Notifikasi Validasi Pembayaran Tunai (Cash) dari Pelanggan Scan QR */}
             {pendingCashOrders.length > 0 && (
                 <div className="bg-amber-500/20 border-b border-amber-500/40 px-6 py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs">
                     <span className="font-bold text-amber-300">
@@ -211,7 +257,6 @@ export default function Workspace({
                 onPrintReceipt={(order) => setSelectedOrderReceipt(order)}
             />
 
-            {/* Modal Shift Kasir (Buka Shift, Tutup Shift & Riwayat Audit) */}
             <ShiftModal
                 isOpen={showShiftModal}
                 onClose={() => setShowShiftModal(false)}
@@ -220,7 +265,6 @@ export default function Workspace({
                 shiftHistory={shiftHistory}
             />
 
-            {/* Modal Pop-up Pembayaran Online QRIS */}
             <QrisPaymentModal
                 isOpen={showQrisModal}
                 totalAmount={getTotal()}
@@ -229,7 +273,6 @@ export default function Workspace({
                 onClose={() => setShowQrisModal(false)}
             />
 
-            {/* Modal Cetak Struk Thermal & QR Code Token AI */}
             <ReceiptModal
                 order={selectedOrderReceipt}
                 cafeName={auth.cafe?.name}

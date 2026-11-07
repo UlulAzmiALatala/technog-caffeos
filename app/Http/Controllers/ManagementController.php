@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Customer;
 use App\Models\Delivery;
 use App\Models\DiningTable;
 use App\Models\Menu;
@@ -9,6 +10,7 @@ use App\Models\Order;
 use App\Models\Stock;
 use App\Models\Template;
 use App\Models\User;
+use App\Models\Voucher;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Inertia\Inertia;
@@ -25,6 +27,12 @@ class ManagementController extends Controller
             'tables' => DiningTable::where('cafe_id', $cafeId)->orderBy('table_number')->get(),
             'templates' => Template::where('is_active', true)->get(),
             'staffs' => User::where('cafe_id', $cafeId)->latest()->get(),
+            'vouchers' => Voucher::where('cafe_id', $cafeId)->latest()->get(),
+            'customers' => Customer::withCount('orders')
+                ->withSum('orders', 'grand_total')
+                ->where('cafe_id', $cafeId)
+                ->latest()
+                ->get(),
             'orders' => Order::with(['items.menu', 'table', 'payment', 'delivery'])
                 ->where('cafe_id', $cafeId)
                 ->latest()
@@ -183,5 +191,43 @@ class ManagementController extends Controller
         ]);
 
         return back()->with('success', "Akun {$validated['role']} ({$validated['name']}) berhasil ditambahkan!");
+    }
+
+    // 6. KELOLA VOUCHER PROMO & DISKON
+    public function storeVoucher(Request $request)
+    {
+        $validated = $request->validate([
+            'code' => 'required|string|max:50',
+            'name' => 'required|string|max:150',
+            'discount_type' => 'required|in:percent,fixed',
+            'discount_value' => 'required|numeric|min:1',
+            'min_order_amount' => 'nullable|numeric|min:0',
+            'quota' => 'required|integer|min:1',
+        ]);
+
+        Voucher::create([
+            'cafe_id' => $request->user()->cafe_id,
+            'code' => strtoupper(trim($validated['code'])),
+            'name' => $validated['name'],
+            'discount_type' => $validated['discount_type'],
+            'discount_value' => $validated['discount_value'],
+            'min_order_amount' => $validated['min_order_amount'] ?? 0,
+            'quota' => $validated['quota'],
+            'is_active' => true,
+        ]);
+
+        return back()->with('success', "Voucher Promo {$validated['code']} berhasil diterbitkan!");
+    }
+
+    public function toggleVoucher(Voucher $voucher)
+    {
+        $voucher->update(['is_active' => !$voucher->is_active]);
+        return back()->with('success', "Status Voucher {$voucher->code} diperbarui!");
+    }
+
+    public function destroyVoucher(Voucher $voucher)
+    {
+        $voucher->delete();
+        return back()->with('success', 'Voucher berhasil dihapus.');
     }
 }
