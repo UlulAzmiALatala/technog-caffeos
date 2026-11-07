@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AiToken;
+use App\Models\CashierShift;
 use App\Models\Customer;
 use App\Models\DiningTable;
 use App\Models\Menu;
@@ -16,12 +17,12 @@ use Inertia\Inertia;
 
 class PosController extends Controller
 {
-    // 1. Halaman Utama POS Kasir / Barista / Owner
+    // 1. Halaman Utama POS Kasir / Barista / Owner + Status Shift Aktif
     public function index(Request $request)
     {
         $cafeId = $request->user()->cafe_id;
 
-        // Pastikan Template ke-3 (Neo-Brutalist Pop) otomatis tersedia di database
+        // Pastikan Template ke-3 (Neo-Brutalist Pop) tersedia di database
         Template::firstOrCreate(
             ['slug' => 'neo-brutal'],
             [
@@ -30,6 +31,42 @@ class PosController extends Controller
                 'is_active' => true,
             ]
         );
+
+        // Cek apakah ada Shift Kasir yang sedang berstatus 'open' di kafe ini
+        $activeShift = CashierShift::with('user')
+            ->where('cafe_id', $cafeId)
+            ->where('status', 'open')
+            ->latest('opened_at')
+            ->first();
+
+        $shiftStats = [
+            'cash_sales' => 0,
+            'qris_sales' => 0,
+            'expected_cash' => 0,
+        ];
+
+        if ($activeShift) {
+            // Hitung otomatis semua pembayaran lunas sejak shift dibuka
+            $cashSales = Payment::whereHas('order', function ($q) use ($cafeId, $activeShift) {
+                $q->where('cafe_id', $cafeId)->where('created_at', '>=', $activeShift->opened_at);
+            })
+                ->where('payment_status', 'paid')
+                ->where('payment_method', 'cash')
+                ->sum('amount_paid');
+
+            $qrisSales = Payment::whereHas('order', function ($q) use ($cafeId, $activeShift) {
+                $q->where('cafe_id', $cafeId)->where('created_at', '>=', $activeShift->opened_at);
+            })
+                ->where('payment_status', 'paid')
+                ->where('payment_method', '!=', 'cash')
+                ->sum('amount_paid');
+
+            $shiftStats = [
+                'cash_sales' => (float) $cashSales,
+                'qris_sales' => (float) $qrisSales,
+                'expected_cash' => (float) $activeShift->opening_cash + (float) $cashSales,
+            ];
+        }
 
         return Inertia::render('Pos/Workspace', [
             'menus' => Menu::with('stocks')
@@ -43,10 +80,100 @@ class PosController extends Controller
                 ->latest()
                 ->take(15)
                 ->get(),
+            'activeShift' => $activeShift,
+            'shiftStats' => $shiftStats,
+            'shiftHistory' => CashierShift::with('user')
+                ->where('cafe_id', $cafeId)
+                ->latest()
+                ->take(15)
+                ->get(),
         ]);
     }
 
-    // 2. Ganti Template UI secara Real-Time
+    // 2. Buka Shift Kasir Baru (Input Modal Awal / Petty Cash)
+    public function openShift(Request $request)
+    {
+        $validated = $request->validate([
+            'opening_cash' => 'required|numeric|min:0',
+            'notes' => 'nullable|string|max:255',
+        ]);
+
+        $cafeId = $request->user()->cafe_id;
+
+        // Pastikan tidak ada shift ganda yang terbuka
+        $existing = CashierShift::where('cafe_id', $cafeId)->where('status', 'open')->first();
+        if ($existing) {
+            return back()->with('success', 'Shift kasir sudah terbuka.');
+        }
+
+        CashierShift::create([
+            'cafe_id' => $cafeId,
+            'user_id' => $request->user()->id,
+            'opening_cash' => $validated['opening_cash'],
+            'expected_cash' => $validated['opening_cash'],
+            'status' => 'open',
+            'notes' => $validated['notes'] ?? null,
+            'opened_at' => now(),
+        ]);
+
+        return back()->with(
+            'success',
+            'Shift Kasir berhasil dibuka dengan Modal Awal Rp ' . number_format($validated['opening_cash'], 0, ',', '.')
+        );
+    }
+
+    // 3. Tutup Shift Kasir & Rekap Selisih Uang Fisik di Laci
+    public function closeShift(Request $request)
+    {
+        $validated = $request->validate([
+            'actual_cash' => 'required|numeric|min:0',
+            'notes' => 'nullable|string|max:255',
+        ]);
+
+        $cafeId = $request->user()->cafe_id;
+
+        $activeShift = CashierShift::where('cafe_id', $cafeId)
+            ->where('status', 'open')
+            ->latest('opened_at')
+            ->firstOrFail();
+
+        $cashSales = Payment::whereHas('order', function ($q) use ($cafeId, $activeShift) {
+            $q->where('cafe_id', $cafeId)->where('created_at', '>=', $activeShift->opened_at);
+        })
+            ->where('payment_status', 'paid')
+            ->where('payment_method', 'cash')
+            ->sum('amount_paid');
+
+        $qrisSales = Payment::whereHas('order', function ($q) use ($cafeId, $activeShift) {
+            $q->where('cafe_id', $cafeId)->where('created_at', '>=', $activeShift->opened_at);
+        })
+            ->where('payment_status', 'paid')
+            ->where('payment_method', '!=', 'cash')
+            ->sum('amount_paid');
+
+        $expectedCash = (float) $activeShift->opening_cash + (float) $cashSales;
+        $actualCash = (float) $validated['actual_cash'];
+        $difference = $actualCash - $expectedCash;
+
+        $activeShift->update([
+            'total_cash_sales' => $cashSales,
+            'total_qris_sales' => $qrisSales,
+            'expected_cash' => $expectedCash,
+            'actual_cash' => $actualCash,
+            'difference' => $difference,
+            'status' => 'closed',
+            'notes' => $validated['notes'] ?? $activeShift->notes,
+            'closed_at' => now(),
+        ]);
+
+        $statusText = $difference == 0
+            ? 'BALANCE (Sesuai)'
+            : ($difference < 0 ? 'MINUS Rp ' . number_format(abs($difference), 0, ',', '.') : 'SURPLUS Rp ' . number_format($difference, 0, ',', '.'));
+
+        return back()->with('success', "Shift Kasir resmi ditutup! Status Laci: {$statusText}.");
+    }
+
+    // 4. Ganti Template UI secara Real-Time
     public function switchTemplate(Request $request)
     {
         $request->validate(['template_id' => 'required|exists:templates,id']);
@@ -55,7 +182,7 @@ class PosController extends Controller
         return back()->with('success', 'Template UI Kafe berhasil diubah!');
     }
 
-    // 3. Engine Checkout Transaksi (Cash & Online Payment) + Generate AI Token
+    // 5. Engine Checkout Transaksi (Cash & Online Payment) + Generate AI Token
     public function checkout(Request $request)
     {
         $validated = $request->validate([
@@ -73,7 +200,6 @@ class PosController extends Controller
         $cafeId = $request->user()->cafe_id;
 
         return DB::transaction(function () use ($validated, $cafeId, $request) {
-            // Hitung nomor antrean harian (Call Queue)
             $todayCount = Order::where('cafe_id', $cafeId)->whereDate('created_at', today())->count();
             $queueNumber = $todayCount + 1;
 
@@ -94,14 +220,12 @@ class PosController extends Controller
                     'notes' => $item['notes'] ?? null,
                 ];
 
-                // Potong Stok Bahan Baku Otomatis sesuai Resep (menu_stocks)
                 foreach ($menu->stocks as $stock) {
                     $totalNeeded = $stock->pivot->qty_needed * $item['qty'];
                     $stock->decrement('current_qty', $totalNeeded);
                 }
             }
 
-            // Simpan atau update data ke tabel customers jika nomor HP diisi
             $customer = null;
             if (!empty($validated['customer_phone'])) {
                 $customer = Customer::firstOrCreate(
@@ -113,7 +237,6 @@ class PosController extends Controller
                 );
             }
 
-            // A. Simpan Header Order
             $order = Order::create([
                 'cafe_id' => $cafeId,
                 'customer_id' => $customer?->id,
@@ -128,10 +251,8 @@ class PosController extends Controller
                 'grand_total' => $subtotal,
             ]);
 
-            // B. Simpan Detail Item
             $order->items()->createMany($orderItemsData);
 
-            // C. Simpan Pembayaran
             Payment::create([
                 'order_id' => $order->id,
                 'payment_method' => $validated['payment_method'],
@@ -140,7 +261,6 @@ class PosController extends Controller
                 'paid_at' => now(),
             ]);
 
-            // D. Generate AI Token Otomatis (Syarat membuka AI Chatbot Co-Worker)
             $aiToken = AiToken::create([
                 'cafe_id' => $cafeId,
                 'order_id' => $order->id,
@@ -151,13 +271,13 @@ class PosController extends Controller
             ]);
 
             return back()->with([
-                'success' => "Order #{$order->queue_number} berhasil! Stok terpotong otomatis.",
+                'success' => "Order #{$order->queue_number} berhasil! Saldo Shift Kasir & Stok otomatis diperbarui.",
                 'ai_token' => $aiToken->token_code,
             ]);
         });
     }
 
-    // 4. Validasi Pembayaran Tunai (Cash) dari Pelanggan Scan QR -> Terbitkan Token AI
+    // 6. Validasi Pembayaran Tunai (Cash) dari Pelanggan Scan QR -> Terbitkan Token AI
     public function approveCashOrder($orderId)
     {
         return DB::transaction(function () use ($orderId) {
@@ -167,7 +287,6 @@ class PosController extends Controller
                 return back();
             }
 
-            // Potong stok bahan baku setelah uang tunai diterima kasir
             foreach ($order->items as $item) {
                 foreach ($item->menu->stocks as $stock) {
                     $stock->decrement('current_qty', $stock->pivot->qty_needed * $item->qty);
@@ -195,7 +314,7 @@ class PosController extends Controller
             ]);
 
             return back()->with([
-                'success' => "Pembayaran Tunai Order #{$order->queue_number} berhasil divalidasi!",
+                'success' => "Pembayaran Tunai Order #{$order->queue_number} berhasil divalidasi & masuk ke Laci Shift!",
                 'ai_token' => $aiToken->token_code,
             ]);
         });

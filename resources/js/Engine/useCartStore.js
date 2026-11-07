@@ -10,12 +10,14 @@ export const useCartStore = create(
             tableId: "",
             orderType: "dine_in",
             paymentMethod: "qris",
+            appliedVoucher: null, // Menyimpan objek voucher yang dipilih
 
             setCustomerName: (name) => set({ customerName: name }),
             setCustomerPhone: (phone) => set({ customerPhone: phone }),
             setTableId: (id) => set({ tableId: id }),
             setOrderType: (type) => set({ orderType: type }),
             setPaymentMethod: (method) => set({ paymentMethod: method }),
+            setAppliedVoucher: (voucher) => set({ appliedVoucher: voucher }),
 
             addToCart: (menu) => {
                 const currentCart = get().cart;
@@ -58,11 +60,34 @@ export const useCartStore = create(
                 set({ cart: updated });
             },
 
-            getTotal: () => {
+            getSubtotal: () => {
                 return get().cart.reduce(
                     (sum, item) => sum + item.price * item.qty,
                     0,
                 );
+            },
+
+            getDiscountAmount: () => {
+                const subtotal = get().getSubtotal();
+                const voucher = get().appliedVoucher;
+                if (
+                    !voucher ||
+                    subtotal < Number(voucher.min_order_amount || 0)
+                ) {
+                    return 0;
+                }
+                if (voucher.discount_type === "percent") {
+                    return Math.round(
+                        (subtotal * Number(voucher.discount_value)) / 100,
+                    );
+                }
+                return Math.min(subtotal, Number(voucher.discount_value));
+            },
+
+            getTotal: () => {
+                const subtotal = get().getSubtotal();
+                const discount = get().getDiscountAmount();
+                return Math.max(0, subtotal - discount);
             },
 
             clearCart: () =>
@@ -71,10 +96,11 @@ export const useCartStore = create(
                     customerName: "",
                     customerPhone: "",
                     tableId: "",
+                    appliedVoucher: null,
                 }),
         }),
         {
-            name: "caffeos-cart-storage", // Tersimpan otomatis di LocalStorage browser
+            name: "caffeos-cart-storage",
         },
     ),
 );

@@ -36,12 +36,16 @@ Route::middleware(['auth', 'role:owner'])->group(function () {
     Route::get('/owner/export-csv', [OwnerController::class, 'exportCsv'])->name('owner.export');
 });
 
-// 5. Grup Route Operasional POS & Manajemen Dapur (Owner, Cashier, & Barista)
+// 5. Grup Route Operasional POS, Shift Kasir & Manajemen Dapur (Owner, Cashier, & Barista)
 Route::middleware(['auth', 'role:owner,cashier,barista'])->group(function () {
     Route::get('/pos', [PosController::class, 'index'])->name('pos.index');
     Route::post('/pos/checkout', [PosController::class, 'checkout'])->name('pos.checkout');
     Route::post('/pos/switch-template', [PosController::class, 'switchTemplate'])->name('pos.switch-template');
     Route::post('/pos/orders/{order}/approve-cash', [PosController::class, 'approveCashOrder'])->name('pos.approve-cash');
+
+    // Route Buka & Tutup Shift Kasir (Petty Cash)
+    Route::post('/pos/shift/open', [PosController::class, 'openShift'])->name('pos.shift.open');
+    Route::post('/pos/shift/close', [PosController::class, 'closeShift'])->name('pos.shift.close');
 
     Route::get('/management', [ManagementController::class, 'index'])->name('management.index');
     Route::post('/management/stocks', [ManagementController::class, 'storeStock'])->name('management.stocks.store');
