@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Head, router } from "@inertiajs/react";
+import { Head, router, usePage } from "@inertiajs/react";
 import {
     Bot,
     Lock,
@@ -9,15 +9,18 @@ import {
     Sparkles,
     ChefHat,
     Coffee,
-    Truck,
+    BellRing,
+    Star,
 } from "lucide-react";
 
 export default function OrderStatusAndAi({ order, chatLogs }) {
+    const { flash } = usePage().props;
     const [prompt, setPrompt] = useState("");
+    const [rating, setRating] = useState(5);
+    const [comment, setComment] = useState("");
     const isUnlocked =
         order.payment?.payment_status === "paid" && order.ai_token;
 
-    // Auto-polling setiap 5 detik agar status dapur & buka kunci Token AI ter-update otomatis tanpa refresh manual
     useEffect(() => {
         const interval = setInterval(() => {
             router.reload({
@@ -39,6 +42,26 @@ export default function OrderStatusAndAi({ order, chatLogs }) {
         );
     };
 
+    const handleWaiterCall = (callType) => {
+        router.post(
+            route("customer.action", order.order_code),
+            { waiter_call_type: callType },
+            { preserveScroll: true },
+        );
+    };
+
+    const handleSubmitReview = (e) => {
+        e.preventDefault();
+        router.post(
+            route("customer.action", order.order_code),
+            { rating, comment },
+            {
+                preserveScroll: true,
+                onSuccess: () => setComment(""),
+            },
+        );
+    };
+
     const steps = [
         { key: "pending", label: "Validasi Kasir", icon: Clock },
         { key: "paid", label: "Antrean Dapur", icon: CheckCircle2 },
@@ -53,6 +76,12 @@ export default function OrderStatusAndAi({ order, chatLogs }) {
             <Head title={`Order #${order.queue_number} - AI Co-Worker`} />
 
             <div className="max-w-3xl mx-auto space-y-6">
+                {flash?.success && (
+                    <div className="p-3.5 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-bold text-center">
+                        ✨ {flash.success}
+                    </div>
+                )}
+
                 {/* Kartu Nomor Antrean & Live Progress Tracker */}
                 <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-5">
                     <div className="flex flex-wrap justify-between items-center gap-4">
@@ -92,7 +121,6 @@ export default function OrderStatusAndAi({ order, chatLogs }) {
                         )}
                     </div>
 
-                    {/* Visual Progress Bar Alur Flowchart (Validasi -> Dapur Proses -> Siap Saji) */}
                     <div className="grid grid-cols-4 gap-2 pt-2 border-t border-slate-800">
                         {steps.map((st, idx) => {
                             const Icon = st.icon;
@@ -115,6 +143,30 @@ export default function OrderStatusAndAi({ order, chatLogs }) {
                                 </div>
                             );
                         })}
+                    </div>
+
+                    {/* Tombol Pintasan Panggil Pelayan (Smart Waiter Call) */}
+                    <div className="pt-3 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
+                        <span className="text-amber-300 font-bold flex items-center gap-1.5">
+                            <BellRing className="w-4 h-4" /> Butuh Bantuan di
+                            Meja?
+                        </span>
+                        <div className="flex flex-wrap gap-2">
+                            {[
+                                "🛎️ Panggil Pelayan",
+                                "🧻 Minta Tisu / Sendok",
+                                "🧹 Bersihkan Meja",
+                            ].map((act) => (
+                                <button
+                                    key={act}
+                                    type="button"
+                                    onClick={() => handleWaiterCall(act)}
+                                    className="px-3 py-1.5 rounded-xl bg-slate-950 hover:bg-amber-500 hover:text-slate-950 border border-slate-700 text-slate-200 font-bold transition"
+                                >
+                                    {act}
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 </div>
 
@@ -155,7 +207,7 @@ export default function OrderStatusAndAi({ order, chatLogs }) {
                         </div>
                     ) : (
                         <div className="space-y-4">
-                            <div className="h-72 overflow-y-auto space-y-3 p-4 rounded-xl bg-slate-950 border border-slate-800">
+                            <div className="h-64 overflow-y-auto space-y-3 p-4 rounded-xl bg-slate-950 border border-slate-800">
                                 {chatLogs.length === 0 && (
                                     <p className="text-xs text-slate-500 text-center py-10">
                                         Token AI Anda aktif! Tanyakan
@@ -201,6 +253,51 @@ export default function OrderStatusAndAi({ order, chatLogs }) {
                         </div>
                     )}
                 </div>
+
+                {/* Form Rating & Ulasan Pelanggan untuk Barista */}
+                <form
+                    onSubmit={handleSubmitReview}
+                    className="p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-4"
+                >
+                    <div className="flex items-center justify-between">
+                        <h3 className="font-bold text-sm flex items-center gap-2 text-yellow-400">
+                            <Star className="w-4 h-4 fill-yellow-400" /> Beri
+                            Rating Rasa Kopi & Pelayanan Barista Kami
+                        </h3>
+                        <div className="flex gap-1">
+                            {[1, 2, 3, 4, 5].map((num) => (
+                                <button
+                                    key={num}
+                                    type="button"
+                                    onClick={() => setRating(num)}
+                                    className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
+                                        rating >= num
+                                            ? "bg-yellow-400 text-slate-950"
+                                            : "bg-slate-800 text-slate-400"
+                                    }`}
+                                >
+                                    {num} ⭐
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="flex gap-2">
+                        <input
+                            type="text"
+                            placeholder="Tulis kesan atau masukan singkat Anda..."
+                            value={comment}
+                            onChange={(e) => setComment(e.target.value)}
+                            className="flex-1 rounded-xl bg-slate-950 border-slate-800 text-xs text-white"
+                        />
+                        <button
+                            type="submit"
+                            className="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs"
+                        >
+                            Kirim Ulasan
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     );

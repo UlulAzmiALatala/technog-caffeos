@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\CustomerOrderController;
 use App\Http\Controllers\FinanceController;
+use App\Http\Controllers\HrAndFeedbackController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\ManagementController;
 use App\Http\Controllers\OwnerController;
@@ -18,10 +19,11 @@ Route::get('/', [TenantOnboardingController::class, 'landing'])->name('welcome')
 Route::post('/saas/register-cafe', [TenantOnboardingController::class, 'registerCafe'])->name('saas.register-cafe');
 Route::post('/saas/quick-demo', [TenantOnboardingController::class, 'quickDemoLogin'])->name('saas.quick-demo');
 
-// 2. Route Publik untuk Pelanggan (Scan QR Code Meja, Self-Order, & AI Chatbot Co-Worker)
+// 2. Route Publik untuk Pelanggan (Scan QR Code Meja, Self-Order, Waiter Call, Rating, & AI Co-Worker)
 Route::get('/order/qr/{qrCode}', [CustomerOrderController::class, 'scanTable'])->name('customer.scan');
 Route::post('/order/qr/{qrCode}', [CustomerOrderController::class, 'submitOrder'])->name('customer.submit-order');
 Route::get('/order/status/{orderCode}', [CustomerOrderController::class, 'orderStatus'])->name('customer.order-status');
+Route::post('/order/status/{orderCode}/action', [HrAndFeedbackController::class, 'submitCustomerAction'])->name('customer.action');
 Route::post('/order/ai-chat', [CustomerOrderController::class, 'askAi'])->name('customer.ask-ai');
 
 // 3. Smart Redirect Setelah Login Berdasarkan Role User
@@ -46,7 +48,6 @@ Route::middleware(['auth', 'role:owner'])->group(function () {
     Route::post('/owner/settings', [OwnerController::class, 'updateCafeSettings'])->name('owner.settings.update');
     Route::get('/owner/export-csv', [OwnerController::class, 'exportCsv'])->name('owner.export');
 
-    // Hanya Owner yang boleh membuat akun Karyawan baru (Cashier/Barista/Owner)
     Route::post('/management/staffs', [ManagementController::class, 'storeStaff'])->name('management.staffs.store');
 });
 
@@ -82,7 +83,7 @@ Route::middleware(['auth', 'role:owner,barista'])->group(function () {
     Route::delete('/management/menus/{menu}', [ManagementController::class, 'destroyMenu'])->name('management.menus.destroy');
 });
 
-// 7. GRUP BERSAMA: OWNER, CASHIER, & BARISTA (Dapur Order, TV Antrean, Denah Meja, & Ganti Tema Demo)
+// 7. GRUP BERSAMA: OWNER, CASHIER, & BARISTA (Dapur, TV Antrean, Denah Meja, & HR Absensi/Layanan)
 Route::middleware(['auth', 'role:owner,cashier,barista'])->group(function () {
     Route::get('/queue-board', [PosController::class, 'queueBoard'])->name('pos.queue-board');
     Route::post('/pos/switch-template', [PosController::class, 'switchTemplate'])->name('pos.switch-template');
@@ -91,6 +92,13 @@ Route::middleware(['auth', 'role:owner,cashier,barista'])->group(function () {
     Route::post('/reservations', [ReservationController::class, 'storeReservation'])->name('reservations.store');
     Route::post('/reservations/{reservation}/status', [ReservationController::class, 'updateReservationStatus'])->name('reservations.status');
     Route::post('/reservations/tables/{table}/status', [ReservationController::class, 'updateTableStatus'])->name('reservations.tables.status');
+
+    Route::get('/hr', [HrAndFeedbackController::class, 'index'])->name('hr.index');
+    Route::post('/hr/enroll-face', [HrAndFeedbackController::class, 'enrollMasterFace'])->name('hr.enroll-face');
+    Route::post('/hr/clock-in', [HrAndFeedbackController::class, 'clockIn'])->name('hr.clock-in');
+    Route::post('/hr/clock-out', [HrAndFeedbackController::class, 'clockOut'])->name('hr.clock-out');
+    Route::post('/hr/set-cafe-location', [HrAndFeedbackController::class, 'setCafeLocation'])->name('hr.set-cafe-location');
+    Route::post('/hr/calls/{feedback}/resolve', [HrAndFeedbackController::class, 'resolveCall'])->name('hr.calls.resolve');
 
     Route::get('/management', [ManagementController::class, 'index'])->name('management.index');
     Route::post('/management/menus/{menu}/toggle', [ManagementController::class, 'toggleMenuAvailability'])->name('management.menus.toggle');
