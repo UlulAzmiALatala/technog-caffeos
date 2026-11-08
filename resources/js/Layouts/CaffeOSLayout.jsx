@@ -23,10 +23,14 @@ import {
     Activity,
     Clock,
     CheckCircle2,
+    XCircle,
+    AlertTriangle,
     X,
     UserCog,
     PieChart,
     Megaphone,
+    Flame,
+    Wrench,
 } from "lucide-react";
 
 export default function CaffeOSLayout({
@@ -34,7 +38,7 @@ export default function CaffeOSLayout({
     templates = [],
     tables = [],
 }) {
-    const { auth, flash } = usePage().props;
+    const { auth, flash, errors } = usePage().props;
     const userRole = auth.user?.role || "cashier";
     const activeSlug = auth.activeTemplate || "cyber-dark";
 
@@ -56,21 +60,46 @@ export default function CaffeOSLayout({
     const notifRef = useRef(null);
     const profileRef = useRef(null);
 
+    // =========================================================================
+    // UNIVERSAL FLOATING TOAST ENGINE (MENANGANI BERHASIL & GAGAL DI SEMUA HALAMAN)
+    // =========================================================================
     const [toasts, setToasts] = useState([]);
 
     const pushToast = (message, token = null, type = "success") => {
+        if (!message) return;
         const id = Date.now() + Math.random();
         setToasts((prev) => [...prev, { id, message, token, type }]);
         setTimeout(() => {
             setToasts((prev) => prev.filter((t) => t.id !== id));
-        }, 4200);
+        }, 4500);
     };
 
+    // 1. Pantau setiap kali request Inertia selesai (Agar klik berulang dengan pesan sama tetap muncul Toast!)
+    useEffect(() => {
+        const removeFinishListener = router.on("finish", () => {
+            // Cek dilakukan via perubahan props di bawah
+        });
+        return () => removeFinishListener();
+    }, []);
+
+    // 2. Tangkap Flash Success & Flash Error dari Controller mana pun
     useEffect(() => {
         if (flash?.success) {
             pushToast(flash.success, flash.ai_token || null, "success");
         }
-    }, [flash?.success, flash?.ai_token]);
+        if (flash?.error) {
+            pushToast(flash.error, null, "error");
+        }
+    }, [flash]);
+
+    // 3. Tangkap Error Validasi Form (Jika ada input kurang/salah saat klik Tambah/Simpan)
+    useEffect(() => {
+        const errorKeys = Object.keys(errors || {});
+        if (errorKeys.length > 0) {
+            const firstErrorMsg = errors[errorKeys[0]];
+            pushToast(`Gagal Memproses: ${firstErrorMsg}`, null, "error");
+        }
+    }, [errors]);
 
     const [currentTime, setCurrentTime] = useState(new Date());
     useEffect(() => {
@@ -102,6 +131,7 @@ export default function CaffeOSLayout({
         year: "numeric",
     });
 
+    // Struktur Navigasi Lengkap Berkelompok sesuai Role
     const navGroups = [
         {
             id: "executive",
@@ -194,6 +224,17 @@ export default function CaffeOSLayout({
             groupTitle: "Dapur & Rantai Pasok",
             items: [
                 {
+                    name: "Smart KDS Barista",
+                    subtext: "SLA Stopwatch & Resep",
+                    href: route("kds.index"),
+                    active: route().current("kds.*"),
+                    icon: Flame,
+                    badge: "SLA",
+                    badgeColor:
+                        "bg-rose-500/15 text-rose-300 border-rose-500/30",
+                    roles: ["owner", "barista", "cashier"],
+                },
+                {
                     name: "Dapur & Resep Menu",
                     subtext: "Order, Promo & Member",
                     href: route("management.index"),
@@ -208,6 +249,14 @@ export default function CaffeOSLayout({
                     active: route().current("inventory.*"),
                     icon: Truck,
                     roles: ["owner", "barista"],
+                },
+                {
+                    name: "Mesin & Shift Roster",
+                    subtext: "Kalibrasi Alat & Jadwal",
+                    href: route("operations.index"),
+                    active: route().current("operations.*"),
+                    icon: Wrench,
+                    roles: ["owner", "barista", "cashier"],
                 },
             ],
         },
@@ -331,44 +380,77 @@ export default function CaffeOSLayout({
                 .custom-scrollbar::-webkit-scrollbar-thumb { background-color: rgba(16, 185, 129, 0.3); border-radius: 10px; }
             `}</style>
 
-            {/* FLOATING TOAST NOTIFICATION KANAN ATAS */}
+            {/* FLOATING TOAST NOTIFICATION KANAN ATAS (HIJAU UNTUK BERHASIL, MERAH UNTUK GAGAL/ERROR) */}
             <div className="fixed top-5 right-5 z-[100] flex flex-col gap-3 max-w-sm w-full pointer-events-none">
-                {toasts.map((t) => (
-                    <div
-                        key={t.id}
-                        className="pointer-events-auto relative overflow-hidden rounded-2xl bg-slate-900/95 backdrop-blur-2xl border border-emerald-500/50 text-white p-4 shadow-[0_20px_50px_rgba(0,0,0,0.5)] transition-all duration-300"
-                    >
-                        <div className="flex items-start gap-3">
-                            <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400 shrink-0">
-                                <CheckCircle2 className="w-5 h-5" />
+                {toasts.map((t) => {
+                    const isError = t.type === "error";
+                    return (
+                        <div
+                            key={t.id}
+                            className={`pointer-events-auto relative overflow-hidden rounded-2xl bg-slate-900/95 backdrop-blur-2xl border p-4 shadow-[0_20px_50px_rgba(0,0,0,0.5)] transition-all duration-300 text-white ${
+                                isError
+                                    ? "border-rose-500/60"
+                                    : "border-emerald-500/50"
+                            }`}
+                        >
+                            <div className="flex items-start gap-3">
+                                <div
+                                    className={`p-2 rounded-xl shrink-0 ${
+                                        isError
+                                            ? "bg-rose-500/20 text-rose-400"
+                                            : "bg-emerald-500/20 text-emerald-400"
+                                    }`}
+                                >
+                                    {isError ? (
+                                        <XCircle className="w-5 h-5" />
+                                    ) : (
+                                        <CheckCircle2 className="w-5 h-5" />
+                                    )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p
+                                        className={`text-[11px] font-black uppercase tracking-widest ${
+                                            isError
+                                                ? "text-rose-400"
+                                                : "text-emerald-400"
+                                        }`}
+                                    >
+                                        {isError
+                                            ? "Peringatan / Gagal"
+                                            : "Berhasil Diproses"}
+                                    </p>
+                                    <p className="text-xs font-bold text-slate-100 mt-0.5 leading-relaxed">
+                                        {t.message}
+                                    </p>
+                                    {t.token && (
+                                        <span className="inline-block mt-1.5 px-2.5 py-0.5 rounded-md bg-purple-500/20 border border-purple-500/40 text-purple-300 font-mono text-[11px] font-bold">
+                                            Token AI: {t.token}
+                                        </span>
+                                    )}
+                                </div>
+                                <button
+                                    onClick={() =>
+                                        setToasts((prev) =>
+                                            prev.filter(
+                                                (item) => item.id !== t.id,
+                                            ),
+                                        )
+                                    }
+                                    className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
                             </div>
-                            <div className="flex-1 min-w-0">
-                                <p className="text-[11px] font-black uppercase tracking-widest text-emerald-400">
-                                    Notifikasi Sistem CaffeOS
-                                </p>
-                                <p className="text-xs font-bold text-slate-100 mt-0.5 leading-relaxed">
-                                    {t.message}
-                                </p>
-                                {t.token && (
-                                    <span className="inline-block mt-1.5 px-2.5 py-0.5 rounded-md bg-purple-500/20 border border-purple-500/40 text-purple-300 font-mono text-[11px] font-bold">
-                                        Token AI: {t.token}
-                                    </span>
-                                )}
-                            </div>
-                            <button
-                                onClick={() =>
-                                    setToasts((prev) =>
-                                        prev.filter((item) => item.id !== t.id),
-                                    )
-                                }
-                                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
-                            >
-                                <X className="w-4 h-4" />
-                            </button>
+                            <div
+                                className={`absolute bottom-0 left-0 h-1 bg-gradient-to-r animate-[toast-progress_4.5s_linear_forwards] ${
+                                    isError
+                                        ? "from-rose-500 to-amber-500"
+                                        : "from-emerald-400 to-teal-500"
+                                }`}
+                            />
                         </div>
-                        <div className="absolute bottom-0 left-0 h-1 bg-gradient-to-r from-emerald-400 to-teal-500 animate-[toast-progress_4.2s_linear_forwards]" />
-                    </div>
-                ))}
+                    );
+                })}
             </div>
 
             {/* 1. COLLAPSIBLE SIDEBAR */}
@@ -744,21 +826,37 @@ export default function CaffeOSLayout({
                                                 Pusat Notifikasi & Link QR Meja
                                             </h3>
                                             <p className="text-[10px] opacity-60 uppercase tracking-widest">
-                                                Simulasi Self-Order Pelanggan
+                                                Uji Toast Sukses & Gagal
                                             </p>
                                         </div>
-                                        <button
-                                            type="button"
-                                            onClick={() =>
-                                                pushToast(
-                                                    "Tes Notifikasi Toast Mengambang berhasil!",
-                                                    "AI-TEST99",
-                                                )
-                                            }
-                                            className="px-2.5 py-1 rounded-lg bg-emerald-500 text-slate-950 text-[10px] font-black"
-                                        >
-                                            ⚡ Tes Toast
-                                        </button>
+                                        <div className="flex gap-1.5">
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    pushToast(
+                                                        "Data berhasil ditambahkan ke sistem!",
+                                                        "AI-OK99",
+                                                        "success",
+                                                    )
+                                                }
+                                                className="px-2 py-1 rounded-lg bg-emerald-500 text-slate-950 text-[10px] font-black"
+                                            >
+                                                + Sukses
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    pushToast(
+                                                        "Gagal menyimpan: Stok tidak mencukupi!",
+                                                        null,
+                                                        "error",
+                                                    )
+                                                }
+                                                className="px-2 py-1 rounded-lg bg-rose-500 text-white text-[10px] font-black"
+                                            >
+                                                ! Gagal
+                                            </button>
+                                        </div>
                                     </div>
 
                                     {tables.length > 0 && (

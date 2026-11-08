@@ -5,9 +5,11 @@ use App\Http\Controllers\FinanceController;
 use App\Http\Controllers\GovernanceController;
 use App\Http\Controllers\HrAndFeedbackController;
 use App\Http\Controllers\InventoryController;
+use App\Http\Controllers\KdsController;
 use App\Http\Controllers\ManagementController;
 use App\Http\Controllers\MarketingController;
 use App\Http\Controllers\MenuEngineeringController;
+use App\Http\Controllers\OperationsController;
 use App\Http\Controllers\OwnerController;
 use App\Http\Controllers\PosController;
 use App\Http\Controllers\ProfileController;
@@ -33,7 +35,7 @@ Route::post('/order/ai-chat', [CustomerOrderController::class, 'askAi'])->name('
 Route::get('/dashboard', function (Request $request) {
     return match ($request->user()->role) {
         'owner' => redirect()->route('owner.dashboard'),
-        'barista' => redirect()->route('management.index'),
+        'barista' => redirect()->route('kds.index'),
         default => redirect()->route('pos.index'),
     };
 })->middleware(['auth', 'verified'])->name('dashboard');
@@ -51,7 +53,6 @@ Route::middleware(['auth', 'role:owner'])->group(function () {
     Route::post('/owner/settings', [OwnerController::class, 'updateCafeSettings'])->name('owner.settings.update');
     Route::get('/owner/export-csv', [OwnerController::class, 'exportCsv'])->name('owner.export');
 
-    // Route Payroll Slip Gaji Otomatis & Audit Trail (CCTV)
     Route::get('/governance', [GovernanceController::class, 'index'])->name('governance.index');
     Route::post('/governance/pay-salary', [GovernanceController::class, 'disburseSalary'])->name('governance.pay-salary');
 
@@ -67,7 +68,6 @@ Route::middleware(['auth', 'role:owner,cashier'])->group(function () {
     Route::post('/pos/shift/open', [PosController::class, 'openShift'])->name('pos.shift.open');
     Route::post('/pos/shift/close', [PosController::class, 'closeShift'])->name('pos.shift.close');
 
-    // Route Loyalty Point Member, Tukar Hadiah & WhatsApp Marketing Blast
     Route::get('/marketing', [MarketingController::class, 'index'])->name('marketing.index');
     Route::post('/marketing/redeem', [MarketingController::class, 'redeemPoints'])->name('marketing.redeem');
     Route::post('/marketing/rewards', [MarketingController::class, 'storeReward'])->name('marketing.rewards.store');
@@ -84,7 +84,6 @@ Route::middleware(['auth', 'role:owner,cashier'])->group(function () {
 
 // 6. GRUP KHUSUS OWNER & BARISTA (HPP Menu Engineering, Gudang Supply Chain, PO Supplier, & Input Resep)
 Route::middleware(['auth', 'role:owner,barista'])->group(function () {
-    // Route Kalkulator HPP Resep & Matriks Statistik Menu Engineering
     Route::get('/menu-engineering', [MenuEngineeringController::class, 'index'])->name('menu-engineering.index');
     Route::post('/menu-engineering/stock-costs', [MenuEngineeringController::class, 'updateStockCosts'])->name('menu-engineering.stocks.costs');
     Route::post('/menu-engineering/menus/{menu}/price', [MenuEngineeringController::class, 'updateMenuPrice'])->name('menu-engineering.menus.price');
@@ -100,8 +99,18 @@ Route::middleware(['auth', 'role:owner,barista'])->group(function () {
     Route::delete('/management/menus/{menu}', [ManagementController::class, 'destroyMenu'])->name('management.menus.destroy');
 });
 
-// 7. GRUP BERSAMA: OWNER, CASHIER, & BARISTA (Dapur, TV Antrean, Denah Meja, & HR Absensi/Layanan)
+// 7. GRUP BERSAMA: OWNER, CASHIER, & BARISTA (Smart KDS, Mesin & Roster, Dapur, TV Antrean, Denah, & HR)
 Route::middleware(['auth', 'role:owner,cashier,barista'])->group(function () {
+    // Route Smart KDS Barista & SLA Stopwatch
+    Route::get('/kds', [KdsController::class, 'index'])->name('kds.index');
+    Route::post('/kds/orders/{order}/bump', [KdsController::class, 'bumpStatus'])->name('kds.bump');
+
+    // Route Monitoring Mesin Kopi & Jadwal Shift Roster Mingguan
+    Route::get('/operations', [OperationsController::class, 'index'])->name('operations.index');
+    Route::post('/operations/equipments', [OperationsController::class, 'storeEquipment'])->name('operations.equipments.store');
+    Route::post('/operations/equipments/service', [OperationsController::class, 'logMaintenance'])->name('operations.equipments.service');
+    Route::post('/operations/roster', [OperationsController::class, 'updateRoster'])->name('operations.roster.save');
+
     Route::get('/queue-board', [PosController::class, 'queueBoard'])->name('pos.queue-board');
     Route::post('/pos/switch-template', [PosController::class, 'switchTemplate'])->name('pos.switch-template');
 
