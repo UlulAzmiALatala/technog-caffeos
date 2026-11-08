@@ -1,118 +1,127 @@
-import InputError from '@/Components/InputError';
-import InputLabel from '@/Components/InputLabel';
-import PrimaryButton from '@/Components/PrimaryButton';
-import TextInput from '@/Components/TextInput';
-import GuestLayout from '@/Layouts/GuestLayout';
-import { Head, Link, useForm } from '@inertiajs/react';
+import React from "react";
+import { Head, Link, useForm } from "@inertiajs/react";
+import GuestLayout from "@/Layouts/GuestLayout";
+import { UserPlus, User, Mail, Lock } from "lucide-react";
 
 export default function Register() {
     const { data, setData, post, processing, errors, reset } = useForm({
-        name: '',
-        email: '',
-        password: '',
-        password_confirmation: '',
+        name: "",
+        email: "",
+        password: "",
+        password_confirmation: "",
     });
 
     const submit = (e) => {
         e.preventDefault();
-
-        post(route('register'), {
-            onFinish: () => reset('password', 'password_confirmation'),
+        post(route("register"), {
+            onFinish: () => reset("password", "password_confirmation"),
         });
     };
 
     return (
-        <GuestLayout>
-            <Head title="Register" />
+        <GuestLayout
+            title="Registrasi Akun Personel"
+            subtitle="Buat akun baru untuk terhubung ke sistem manajemen TechnoG CaffeOS."
+        >
+            <Head title="Register — TechnoG CaffeOS" />
 
-            <form onSubmit={submit}>
+            <form onSubmit={submit} className="space-y-4 text-xs">
                 <div>
-                    <InputLabel htmlFor="name" value="Name" />
-
-                    <TextInput
-                        id="name"
-                        name="name"
+                    <label className="font-bold text-slate-300 flex items-center gap-1.5">
+                        <User className="w-3.5 h-3.5 text-emerald-400" /> Nama
+                        Lengkap
+                    </label>
+                    <input
+                        type="text"
+                        required
                         value={data.name}
-                        className="mt-1 block w-full"
-                        autoComplete="name"
-                        isFocused={true}
-                        onChange={(e) => setData('name', e.target.value)}
-                        required
+                        onChange={(e) => setData("name", e.target.value)}
+                        placeholder="Nama Lengkap Anda"
+                        className="w-full mt-1.5 rounded-xl bg-slate-950 border-slate-800 text-xs text-white py-2.5"
                     />
-
-                    <InputError message={errors.name} className="mt-2" />
+                    {errors.name && (
+                        <p className="text-rose-400 text-[11px] font-bold mt-1">
+                            {errors.name}
+                        </p>
+                    )}
                 </div>
 
-                <div className="mt-4">
-                    <InputLabel htmlFor="email" value="Email" />
-
-                    <TextInput
-                        id="email"
+                <div>
+                    <label className="font-bold text-slate-300 flex items-center gap-1.5">
+                        <Mail className="w-3.5 h-3.5 text-emerald-400" /> Alamat
+                        Email
+                    </label>
+                    <input
                         type="email"
-                        name="email"
+                        required
                         value={data.email}
-                        className="mt-1 block w-full"
-                        autoComplete="username"
-                        onChange={(e) => setData('email', e.target.value)}
-                        required
+                        onChange={(e) => setData("email", e.target.value)}
+                        placeholder="nama@kafe.com"
+                        className="w-full mt-1.5 rounded-xl bg-slate-950 border-slate-800 text-xs text-white py-2.5"
                     />
-
-                    <InputError message={errors.email} className="mt-2" />
+                    {errors.email && (
+                        <p className="text-rose-400 text-[11px] font-bold mt-1">
+                            {errors.email}
+                        </p>
+                    )}
                 </div>
 
-                <div className="mt-4">
-                    <InputLabel htmlFor="password" value="Password" />
-
-                    <TextInput
-                        id="password"
-                        type="password"
-                        name="password"
-                        value={data.password}
-                        className="mt-1 block w-full"
-                        autoComplete="new-password"
-                        onChange={(e) => setData('password', e.target.value)}
-                        required
-                    />
-
-                    <InputError message={errors.password} className="mt-2" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label className="font-bold text-slate-300 flex items-center gap-1.5">
+                            <Lock className="w-3.5 h-3.5 text-emerald-400" />{" "}
+                            Password
+                        </label>
+                        <input
+                            type="password"
+                            required
+                            value={data.password}
+                            onChange={(e) =>
+                                setData("password", e.target.value)
+                            }
+                            placeholder="Min. 8 karakter"
+                            className="w-full mt-1.5 rounded-xl bg-slate-950 border-slate-800 text-xs text-white py-2.5"
+                        />
+                    </div>
+                    <div>
+                        <label className="font-bold text-slate-300 flex items-center gap-1.5">
+                            <Lock className="w-3.5 h-3.5 text-emerald-400" />{" "}
+                            Konfirmasi
+                        </label>
+                        <input
+                            type="password"
+                            required
+                            value={data.password_confirmation}
+                            onChange={(e) =>
+                                setData("password_confirmation", e.target.value)
+                            }
+                            placeholder="Ulangi password"
+                            className="w-full mt-1.5 rounded-xl bg-slate-950 border-slate-800 text-xs text-white py-2.5"
+                        />
+                    </div>
                 </div>
+                {errors.password && (
+                    <p className="text-rose-400 text-[11px] font-bold">
+                        {errors.password}
+                    </p>
+                )}
 
-                <div className="mt-4">
-                    <InputLabel
-                        htmlFor="password_confirmation"
-                        value="Confirm Password"
-                    />
+                <button
+                    type="submit"
+                    disabled={processing}
+                    className="w-full py-3.5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-lg transition"
+                >
+                    <UserPlus className="w-4 h-4" /> Daftarkan Akun Sekarang
+                </button>
 
-                    <TextInput
-                        id="password_confirmation"
-                        type="password"
-                        name="password_confirmation"
-                        value={data.password_confirmation}
-                        className="mt-1 block w-full"
-                        autoComplete="new-password"
-                        onChange={(e) =>
-                            setData('password_confirmation', e.target.value)
-                        }
-                        required
-                    />
-
-                    <InputError
-                        message={errors.password_confirmation}
-                        className="mt-2"
-                    />
-                </div>
-
-                <div className="mt-4 flex items-center justify-end">
+                <div className="text-center pt-3 border-t border-slate-800 text-slate-400">
+                    Sudah punya akun?{" "}
                     <Link
-                        href={route('login')}
-                        className="rounded-md text-sm text-gray-600 underline hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                        href={route("login")}
+                        className="text-emerald-400 font-bold hover:underline"
                     >
-                        Already registered?
+                        Login di Sini
                     </Link>
-
-                    <PrimaryButton className="ms-4" disabled={processing}>
-                        Register
-                    </PrimaryButton>
                 </div>
             </form>
         </GuestLayout>
