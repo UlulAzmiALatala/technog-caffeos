@@ -33,6 +33,7 @@ import {
     Bot,
     Send,
     Database,
+    BellRing,
 } from "lucide-react";
 
 export default function CaffeOSLayout({
@@ -40,7 +41,13 @@ export default function CaffeOSLayout({
     templates = [],
     tables = [],
 }) {
-    const { auth, flash, errors, staffAiLogs = [] } = usePage().props;
+    const {
+        auth,
+        flash,
+        errors,
+        staffAiLogs = [],
+        activeWaiterCalls = [],
+    } = usePage().props;
     const userRole = auth.user?.role || "cashier";
     const activeSlug = auth.activeTemplate || "cyber-dark";
 
@@ -66,6 +73,7 @@ export default function CaffeOSLayout({
     const notifRef = useRef(null);
     const profileRef = useRef(null);
     const aiScrollRef = useRef(null);
+    const knownCallIdsRef = useRef(new Set(activeWaiterCalls.map((c) => c.id)));
 
     // Universal Floating Toast Engine
     const [toasts, setToasts] = useState([]);
@@ -77,6 +85,78 @@ export default function CaffeOSLayout({
         setTimeout(() => {
             setToasts((prev) => prev.filter((t) => t.id !== id));
         }, 4500);
+    };
+
+    // Fungsi Bunyi Lonceng & Pengumuman Suara Saat Pelanggan Memanggil Pelayan dari Meja
+    const announceWaiterCall = (tableNumber, customerName, callType) => {
+        try {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (AudioCtx) {
+                const ctx = new AudioCtx();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = "triangle";
+                osc.frequency.setValueAtTime(987.77, ctx.currentTime); // Nada B5
+                gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(
+                    0.001,
+                    ctx.currentTime + 0.6,
+                );
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.6);
+            }
+        } catch (e) {}
+
+        if ("speechSynthesis" in window) {
+            const cleanText = String(callType).replace(/[^\w\s\/]/gi, "");
+            const utterance = new SpeechSynthesisUtterance(
+                `Perhatian staf, panggilan layanan dari meja nomor ${tableNumber}, atas nama ${customerName}, meminta ${cleanText}.`,
+            );
+            utterance.lang = "id-ID";
+            utterance.rate = 0.98;
+            window.speechSynthesis.speak(utterance);
+        }
+    };
+
+    // Global Polling 5 Detik untuk Mendeteksi Panggilan Meja Pelanggan di Semua Halaman Admin
+    useEffect(() => {
+        const pollInterval = setInterval(() => {
+            router.reload({
+                only: ["activeWaiterCalls"],
+                preserveScroll: true,
+                preserveState: true,
+                onSuccess: (page) => {
+                    const latestCalls = page.props.activeWaiterCalls || [];
+                    latestCalls.forEach((call) => {
+                        if (!knownCallIdsRef.current.has(call.id)) {
+                            knownCallIdsRef.current.add(call.id);
+                            pushToast(
+                                `🛎️ Panggilan Meja #${call.table_number} (${call.customer_name}): "${call.waiter_call_type}"`,
+                                null,
+                                "success",
+                            );
+                            announceWaiterCall(
+                                call.table_number,
+                                call.customer_name,
+                                call.waiter_call_type,
+                            );
+                        }
+                    });
+                },
+            });
+        }, 5000);
+
+        return () => clearInterval(pollInterval);
+    }, []);
+
+    const handleResolveWaiterCall = (callId) => {
+        router.post(
+            route("hr.calls.resolve", callId),
+            {},
+            { preserveScroll: true },
+        );
     };
 
     useEffect(() => {
@@ -132,7 +212,6 @@ export default function CaffeOSLayout({
         year: "numeric",
     });
 
-    // Pertanyaan Pintas AI yang Disesuaikan dengan Role (Owner vs Cashier vs Barista)
     const roleQuickPrompts =
         {
             owner: [
@@ -319,9 +398,14 @@ export default function CaffeOSLayout({
                     href: route("hr.index"),
                     active: route().current("hr.*"),
                     icon: UserCheck,
-                    badge: "FaceID",
+                    badge:
+                        activeWaiterCalls.length > 0
+                            ? `${activeWaiterCalls.length} Call`
+                            : "FaceID",
                     badgeColor:
-                        "bg-amber-500/15 text-amber-300 border-amber-500/30",
+                        activeWaiterCalls.length > 0
+                            ? "bg-rose-500 text-white border-rose-400 animate-pulse"
+                            : "bg-amber-500/15 text-amber-300 border-amber-500/30",
                     roles: ["owner", "cashier", "barista"],
                 },
                 {
@@ -494,13 +578,10 @@ export default function CaffeOSLayout({
                 })}
             </div>
 
-            {/* =====================================================================
-                SLIDE-OVER GLOBAL AI CO-WORKER DRAWER (MEMBACA DATABASE UNTUK SEMUA ROLE)
-            ===================================================================== */}
+            {/* SLIDE-OVER GLOBAL AI CO-WORKER DRAWER */}
             {aiDrawerOpen && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[90] flex justify-end">
                     <div className="w-full max-w-md bg-slate-900 border-l border-slate-700 text-slate-100 h-full flex flex-col justify-between shadow-2xl">
-                        {/* Header Drawer AI */}
                         <div className="p-5 border-b border-slate-800 bg-slate-950 flex justify-between items-center">
                             <div className="flex items-center gap-3">
                                 <div className="p-2.5 rounded-2xl bg-purple-500/20 border border-purple-500/40 text-purple-400">
@@ -533,7 +614,6 @@ export default function CaffeOSLayout({
                             </button>
                         </div>
 
-                        {/* Pintasan Pertanyaan Cepat Sesuai Role */}
                         <div className="p-3.5 bg-slate-950/60 border-b border-slate-800 space-y-1.5">
                             <span className="text-[10px] font-black uppercase tracking-wider text-purple-400 block">
                                 ⚡ Klik Pertanyaan Database Cepat (
@@ -554,7 +634,6 @@ export default function CaffeOSLayout({
                             </div>
                         </div>
 
-                        {/* Area Riwayat Percakapan AI */}
                         <div
                             ref={aiScrollRef}
                             className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar"
@@ -569,7 +648,7 @@ export default function CaffeOSLayout({
                                     <p>
                                         Tanyakan omzet, laba bersih, isi uang
                                         laci shift, resep kopi, stok kritis,
-                                        hingga staf yang hadir hari ini.
+                                        hingga topik umum apa saja.
                                     </p>
                                 </div>
                             ) : (
@@ -596,7 +675,6 @@ export default function CaffeOSLayout({
                             )}
                         </div>
 
-                        {/* Input Form Chat AI */}
                         <form
                             onSubmit={(e) => {
                                 e.preventDefault();
@@ -606,7 +684,7 @@ export default function CaffeOSLayout({
                         >
                             <input
                                 type="text"
-                                placeholder={`Tanya data kafe sebagai ${userRole.toUpperCase()}...`}
+                                placeholder={`Tanya data kafe atau topik bebas sbg ${userRole.toUpperCase()}...`}
                                 value={aiPrompt}
                                 onChange={(e) => setAiPrompt(e.target.value)}
                                 className="flex-1 rounded-xl bg-slate-900 border-slate-700 text-xs text-white"
@@ -898,7 +976,7 @@ export default function CaffeOSLayout({
                 </div>
             </aside>
 
-            {/* 2. AREA KANAN: STICKY HEADER + KONTEN UTAMA */}
+            {/* 2. AREA KANAN: STICKY HEADER + GLOBAL WAITER CALL BANNER + KONTEN UTAMA */}
             <div
                 style={{ paddingLeft: `${sidebarWidth}px` }}
                 className="flex-1 flex flex-col min-w-0 transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]"
@@ -946,7 +1024,6 @@ export default function CaffeOSLayout({
                     </div>
 
                     <div className="flex items-center gap-3 sm:gap-4 relative z-10">
-                        {/* TOMBOL GLOBAL AI CO-WORKER (TERSEDIA UNTUK OWNER, CASHIER & BARISTA) */}
                         <button
                             type="button"
                             onClick={() => setAiDrawerOpen(true)}
@@ -983,70 +1060,114 @@ export default function CaffeOSLayout({
                             </div>
                         )}
 
+                        {/* LONCENG NOTIFIKASI: MENAMPILKAN PANGGILAN MEJA PELANGGAN REAL-TIME & LINK QR */}
                         <div className="relative" ref={notifRef}>
+                            {activeWaiterCalls.length > 0 && (
+                                <div className="absolute inset-0 bg-rose-500/40 rounded-2xl blur-md animate-pulse pointer-events-none" />
+                            )}
                             <button
                                 type="button"
                                 onClick={() => {
                                     setIsNotifOpen(!isNotifOpen);
                                     setProfileOpen(false);
                                 }}
-                                className="relative p-3 rounded-2xl bg-black/15 hover:bg-emerald-500/20 border border-current/15 transition-all shadow-sm"
-                                title="Notifikasi & Simulasi QR Meja"
+                                className={`relative p-3 rounded-2xl border transition-all shadow-sm ${
+                                    activeWaiterCalls.length > 0
+                                        ? "bg-rose-500/20 border-rose-500 text-rose-400"
+                                        : "bg-black/15 hover:bg-emerald-500/20 border-current/15"
+                                }`}
+                                title="Panggilan Meja Pelanggan & Simulasi QR"
                             >
                                 <Bell
                                     size={20}
-                                    className="animate-ring-dewa text-emerald-400"
+                                    className={
+                                        activeWaiterCalls.length > 0
+                                            ? "animate-ring-dewa text-rose-400"
+                                            : "text-emerald-400"
+                                    }
                                 />
-                                <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[9px] font-black text-white bg-rose-500 rounded-full border-2 border-slate-900">
-                                    {tables.length || 1}
-                                </span>
+                                {activeWaiterCalls.length > 0 && (
+                                    <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center min-w-[20px] h-[20px] px-1 text-[10px] font-black text-white bg-rose-600 rounded-full border-2 border-slate-950 animate-bounce">
+                                        {activeWaiterCalls.length}
+                                    </span>
+                                )}
                             </button>
 
                             {isNotifOpen && (
                                 <div
-                                    className={`absolute right-0 top-14 mt-2 w-80 sm:w-96 rounded-3xl shadow-2xl p-5 z-50 space-y-4 backdrop-blur-3xl ${currentTheme.dropdown}`}
+                                    className={`absolute right-0 top-14 mt-2 w-80 sm:w-[400px] rounded-3xl shadow-2xl p-5 z-50 space-y-4 backdrop-blur-3xl ${currentTheme.dropdown}`}
                                 >
                                     <div className="flex justify-between items-center border-b border-current/10 pb-3">
                                         <div>
-                                            <h3 className="text-sm font-black">
-                                                Pusat Notifikasi & Link QR Meja
+                                            <h3 className="text-sm font-black flex items-center gap-1.5">
+                                                <BellRing className="w-4 h-4 text-amber-400" />{" "}
+                                                Panggilan Meja & Simulasi QR
                                             </h3>
                                             <p className="text-[10px] opacity-60 uppercase tracking-widest">
-                                                Uji Toast Sukses & Gagal
+                                                {activeWaiterCalls.length}{" "}
+                                                Panggilan Pelayan Aktif
                                             </p>
                                         </div>
-                                        <div className="flex gap-1.5">
-                                            <button
-                                                type="button"
-                                                onClick={() =>
-                                                    pushToast(
-                                                        "Data berhasil ditambahkan ke sistem!",
-                                                        "AI-OK99",
-                                                        "success",
-                                                    )
-                                                }
-                                                className="px-2 py-1 rounded-lg bg-emerald-500 text-slate-950 text-[10px] font-black"
-                                            >
-                                                + Sukses
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() =>
-                                                    pushToast(
-                                                        "Gagal menyimpan: Stok tidak mencukupi!",
-                                                        null,
-                                                        "error",
-                                                    )
-                                                }
-                                                className="px-2 py-1 rounded-lg bg-rose-500 text-white text-[10px] font-black"
-                                            >
-                                                ! Gagal
-                                            </button>
-                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                pushToast(
+                                                    "Notifikasi sistem berfungsi normal!",
+                                                    null,
+                                                    "success",
+                                                )
+                                            }
+                                            className="px-2.5 py-1 rounded-lg bg-emerald-500 text-slate-950 text-[10px] font-black"
+                                        >
+                                            ⚡ Tes Toast
+                                        </button>
+                                    </div>
+
+                                    {/* Daftar Panggilan Pelayan (Smart Waiter Call) di Dropdown Header */}
+                                    <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                                        {activeWaiterCalls.length === 0 ? (
+                                            <p className="text-center py-4 text-xs opacity-60">
+                                                Belum ada panggilan bantuan dari
+                                                meja pelanggan saat ini.
+                                            </p>
+                                        ) : (
+                                            activeWaiterCalls.map((call) => (
+                                                <div
+                                                    key={call.id}
+                                                    className="p-3 rounded-2xl bg-amber-500/15 border border-amber-500/40 flex justify-between items-center gap-2 text-xs"
+                                                >
+                                                    <div>
+                                                        <span className="px-2 py-0.5 rounded bg-amber-400 text-slate-950 font-black text-[10px] mr-1.5">
+                                                            MEJA #
+                                                            {call.table_number}
+                                                        </span>
+                                                        <span className="font-bold">
+                                                            {call.customer_name}
+                                                        </span>
+                                                        <p className="font-extrabold text-amber-400 mt-1">
+                                                            {
+                                                                call.waiter_call_type
+                                                            }
+                                                        </p>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            handleResolveWaiterCall(
+                                                                call.id,
+                                                            )
+                                                        }
+                                                        className="px-2.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-[10px] shrink-0"
+                                                    >
+                                                        ✅ Selesai
+                                                    </button>
+                                                </div>
+                                            ))
+                                        )}
                                     </div>
 
                                     {tables.length > 0 && (
-                                        <div className="space-y-2">
+                                        <div className="space-y-2 pt-2 border-t border-current/10">
                                             <p className="text-[11px] font-bold opacity-75 flex items-center gap-1">
                                                 <QrCode className="w-3.5 h-3.5 text-emerald-400" />{" "}
                                                 Buka Halaman Scan QR Pelanggan:
@@ -1061,7 +1182,7 @@ export default function CaffeOSLayout({
                                                         )}
                                                         target="_blank"
                                                         rel="noreferrer"
-                                                        className="p-2.5 rounded-xl bg-black/20 hover:bg-emerald-500 hover:text-slate-950 border border-current/10 text-xs font-mono font-bold text-center transition"
+                                                        className="p-2 rounded-xl bg-black/20 hover:bg-emerald-500 hover:text-slate-950 border border-current/10 text-xs font-mono font-bold text-center transition"
                                                     >
                                                         📱 Meja #
                                                         {t.table_number} ↗
@@ -1135,6 +1256,46 @@ export default function CaffeOSLayout({
                         </div>
                     </div>
                 </header>
+
+                {/* GLOBAL STICKY BAR PANGGILAN MEJA PELANGGAN (MUNCUL DI SEMUA HALAMAN ADMIN SAAT ADA WAITER CALL) */}
+                {activeWaiterCalls.length > 0 && (
+                    <div className="bg-gradient-to-r from-amber-500/25 via-rose-500/20 to-amber-500/25 border-b border-amber-500/50 px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs">
+                        <div className="flex items-center gap-2 font-black text-amber-300">
+                            <BellRing className="w-4 h-4 animate-bounce text-amber-400" />
+                            <span>
+                                PANGGILAN MEJA PELANGGAN AKTIF (
+                                {activeWaiterCalls.length}):
+                            </span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                            {activeWaiterCalls.map((call) => (
+                                <div
+                                    key={call.id}
+                                    className="px-3 py-1 rounded-xl bg-slate-950 border border-amber-500/50 text-white flex items-center gap-2 shadow"
+                                >
+                                    <span className="px-1.5 py-0.5 rounded bg-amber-400 text-slate-950 font-black text-[10px]">
+                                        MEJA #{call.table_number}
+                                    </span>
+                                    <span className="font-bold">
+                                        {call.customer_name}:
+                                    </span>
+                                    <span className="text-amber-300 font-extrabold">
+                                        {call.waiter_call_type}
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            handleResolveWaiterCall(call.id)
+                                        }
+                                        className="ml-1 px-2 py-0.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-[10px] transition"
+                                    >
+                                        ✓ Layani
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 <main className="flex-1 overflow-y-auto">{children}</main>
             </div>

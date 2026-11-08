@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Cafe;
 use App\Models\DiningTable;
 use App\Models\Menu;
+use App\Models\Order;
 use App\Models\Stock;
 use App\Models\Template;
 use App\Models\User;
@@ -17,26 +18,35 @@ use Inertia\Inertia;
 
 class TenantOnboardingController extends Controller
 {
-    // 1. Halaman Utama SaaS Katalog Template TechnoG CaffeOS
     public function landing()
     {
-        // Pastikan ke-3 template selalu tersedia
-        Template::firstOrCreate(
-            ['slug' => 'neo-brutal'],
-            [
-                'name' => 'Neo-Brutalist Pop',
-                'layout_config' => ['sidebar' => 'left', 'cardStyle' => 'brutal', 'mode' => 'pop'],
-                'is_active' => true,
-            ]
-        );
+        $sampleTable = DiningTable::first();
 
         return Inertia::render('Welcome', [
             'templates' => Template::where('is_active', true)->get(),
-            'cafes' => Cafe::with('template')->latest()->take(6)->get(),
+            'totalCafes' => Cafe::count(),
+            'totalOrders' => Order::count(),
+            'sampleTableQr' => $sampleTable?->qr_code ?? 'CAFEOS-TBL-01',
         ]);
     }
 
-    // 2. Pendaftaran Tenant Kafe Baru (Multi-Tenant SaaS Onboarding)
+    public function quickDemoLogin(Request $request)
+    {
+        $role = $request->input('role', 'owner');
+        $user = User::where('role', $role)->first() ?? User::first();
+
+        if ($user) {
+            Auth::login($user);
+            return match ($user->role) {
+                'owner' => redirect()->route('owner.dashboard')->with('success', "Berhasil masuk ke sesi Demo sebagai OWNER ({$user->name})!"),
+                'barista' => redirect()->route('kds.index')->with('success', "Berhasil masuk ke sesi Demo sebagai BARISTA ({$user->name})!"),
+                default => redirect()->route('pos.index')->with('success', "Berhasil masuk ke sesi Demo sebagai CASHIER ({$user->name})!"),
+            };
+        }
+
+        return back();
+    }
+
     public function registerCafe(Request $request)
     {
         $validated = $request->validate([
@@ -50,82 +60,92 @@ class TenantOnboardingController extends Controller
         ]);
 
         return DB::transaction(function () use ($validated) {
-            // A. Buat Tenant Kafe Baru dengan Template Pilihan
             $cafe = Cafe::create([
                 'template_id' => $validated['template_id'],
                 'name' => $validated['cafe_name'],
-                'slug' => Str::slug($validated['cafe_name']) . '-' . rand(100, 999),
+                'slug' => Str::slug($validated['cafe_name']) . '-' . Str::lower(Str::random(4)),
                 'address' => $validated['address'],
-                'theme_color' => '#10B981',
-                'settings' => ['tax_percent' => 10, 'ai_quota_per_order' => 5],
+                'settings' => [
+                    'tax_percent' => 10,
+                    'ai_quota_per_order' => 5,
+                    'wifi_password' => 'kopitechnog123',
+                ],
+                'is_active' => true,
             ]);
 
-            // B. Buat Akun Owner Kafe
             $owner = User::create([
                 'cafe_id' => $cafe->id,
                 'name' => $validated['owner_name'],
                 'email' => $validated['email'],
                 'phone' => $validated['phone'],
-                'password' => Hash::make($validated['password']),
                 'role' => 'owner',
+                'password' => Hash::make($validated['password']),
                 'is_active' => true,
             ]);
 
-            // C. Buat Meja QR & Stok Starter Otomatis agar Kafe Baru Siap Pakai
-            $prefix = strtoupper(Str::substr(Str::slug($cafe->name, ''), 0, 4));
-            foreach (['01', '02'] as $num) {
-                DiningTable::create([
+            // Buat 2 Meja QR Starter Otomatis
+            DiningTable::insert([
+                [
                     'cafe_id' => $cafe->id,
-                    'table_number' => $num,
-                    'qr_code' => "{$prefix}-TBL-{$num}-" . rand(100, 999),
-                    'location' => 'Indoor',
+                    'table_number' => '01',
+                    'location' => 'Indoor Area',
+                    'qr_code' => 'QR-' . strtoupper(Str::random(6)) . '-01',
                     'status' => 'available',
-                ]);
-            }
-
-            $beans = Stock::create([
-                'cafe_id' => $cafe->id,
-                'name' => 'House Blend Coffee Beans',
-                'type' => 'raw_material',
-                'unit' => 'gram',
-                'current_qty' => 3000,
-                'min_qty_alert' => 300,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ],
+                [
+                    'cafe_id' => $cafe->id,
+                    'table_number' => 'VIP-01',
+                    'location' => 'VIP Co-Working',
+                    'qr_code' => 'QR-' . strtoupper(Str::random(6)) . '-VIP',
+                    'status' => 'available',
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ],
             ]);
 
-            $signatureMenu = Menu::create([
+            // Buat Stok & Menu Starter Otomatis
+            $arabika = Stock::create([
                 'cafe_id' => $cafe->id,
-                'name' => 'Signature Kopi ' . $cafe->name,
+                'name' => 'Biji Kopi Arabika House Blend',
+                'type' => 'raw_material',
+                'unit' => 'gram',
+                'current_qty' => 5000,
+                'min_qty_alert' => 500,
+            ]);
+
+            $susu = Stock::create([
+                'cafe_id' => $cafe->id,
+                'name' => 'Fresh Milk Barista Grade',
+                'type' => 'raw_material',
+                'unit' => 'ml',
+                'current_qty' => 10000,
+                'min_qty_alert' => 1000,
+            ]);
+
+            $menu = Menu::create([
+                'cafe_id' => $cafe->id,
+                'name' => 'Signature Kopi Susu ' . $cafe->name,
                 'category' => 'Coffee',
-                'description' => 'Menu kopi andalan dengan biji kopi pilihan.',
-                'treatment' => 'Double shot espresso + es batu.',
-                'price' => 20000,
+                'price' => 25000,
+                'discount' => 0,
+                'description' => 'Racikan espresso house blend dengan susu segar creamy.',
+                'treatment' => 'Double ristretto 18g + 120ml susu dingin',
                 'is_available' => true,
             ]);
 
-            $signatureMenu->stocks()->attach([$beans->id => ['qty_needed' => 18]]);
+            $menu->stocks()->sync([
+                $arabika->id => ['qty_needed' => 18],
+                $susu->id => ['qty_needed' => 120],
+            ]);
 
-            // D. Langsung Login sebagai Owner Kafe Baru
             Auth::login($owner);
 
             return redirect()->route('owner.dashboard')->with(
                 'success',
-                "Selamat datang di {$cafe->name}! Kafe dan Template pilihan Anda telah aktif."
+                "Selamat datang di TechnoG CaffeOS! Workspace untuk '{$cafe->name}' telah siap digunakan."
             );
         });
-    }
-
-    // 3. Fitur 1-Click Quick Login Role (Memudahkan Testing Owner vs Cashier vs Barista)
-    public function quickDemoLogin(Request $request)
-    {
-        $request->validate(['role' => 'required|in:owner,cashier,barista']);
-
-        $user = User::where('role', $request->role)->firstOrFail();
-        Auth::login($user);
-
-        return match ($user->role) {
-            'owner' => redirect()->route('owner.dashboard'),
-            'barista' => redirect()->route('management.index'),
-            default => redirect()->route('pos.index'),
-        };
     }
 }
