@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\CustomerOrderController;
 use App\Http\Controllers\FinanceController;
+use App\Http\Controllers\GovernanceController;
 use App\Http\Controllers\HrAndFeedbackController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\ManagementController;
@@ -35,7 +36,7 @@ Route::get('/dashboard', function (Request $request) {
     };
 })->middleware(['auth', 'verified'])->name('dashboard');
 
-// 4. GRUP KHUSUS OWNER (Super Admin HQ, Monitoring Bisnis, Export, Settings, & Tambah Karyawan)
+// 4. GRUP KHUSUS OWNER (Super Admin HQ, Monitoring Bisnis, Payroll, Audit CCTV, & Tambah Karyawan)
 Route::middleware(['auth', 'role:owner'])->group(function () {
     Route::get('/super-admin', [SuperAdminController::class, 'index'])->name('superadmin.dashboard');
     Route::post('/super-admin/cafes/{cafe}/toggle', [SuperAdminController::class, 'toggleCafeStatus'])->name('superadmin.cafes.toggle');
@@ -47,6 +48,10 @@ Route::middleware(['auth', 'role:owner'])->group(function () {
     Route::post('/owner/ai-chat', [OwnerController::class, 'askOwnerAi'])->name('owner.ask-ai');
     Route::post('/owner/settings', [OwnerController::class, 'updateCafeSettings'])->name('owner.settings.update');
     Route::get('/owner/export-csv', [OwnerController::class, 'exportCsv'])->name('owner.export');
+
+    // Route Payroll Slip Gaji Otomatis & Audit Trail (CCTV)
+    Route::get('/governance', [GovernanceController::class, 'index'])->name('governance.index');
+    Route::post('/governance/pay-salary', [GovernanceController::class, 'disburseSalary'])->name('governance.pay-salary');
 
     Route::post('/management/staffs', [ManagementController::class, 'storeStaff'])->name('management.staffs.store');
 });

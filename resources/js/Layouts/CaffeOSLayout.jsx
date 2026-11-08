@@ -9,6 +9,7 @@ import {
     Sparkles,
     Palette,
     ShieldCheck,
+    ShieldAlert,
     Tv,
     WalletCards,
     Bell,
@@ -216,6 +217,17 @@ export default function CaffeOSLayout({
                         "bg-amber-500/15 text-amber-300 border-amber-500/30",
                     roles: ["owner", "cashier", "barista"],
                 },
+                {
+                    name: "Payroll & Audit CCTV",
+                    subtext: "Slip Gaji & Log Aktivitas",
+                    href: route("governance.index"),
+                    active: route().current("governance.*"),
+                    icon: ShieldAlert,
+                    badge: "CCTV",
+                    badgeColor:
+                        "bg-rose-500/15 text-rose-300 border-rose-500/30",
+                    roles: ["owner"],
+                },
             ],
         },
     ];
@@ -310,7 +322,7 @@ export default function CaffeOSLayout({
                 {toasts.map((t) => (
                     <div
                         key={t.id}
-                        className="pointer-events-auto relative overflow-hidden rounded-2xl bg-slate-900/95 backdrop-blur-2xl border border-emerald-500/50 text-white p-4 shadow-[0_20px_50px_rgba(0,0,0,0.5)] transition-all duration-300 animate- bounce-short"
+                        className="pointer-events-auto relative overflow-hidden rounded-2xl bg-slate-900/95 backdrop-blur-2xl border border-emerald-500/50 text-white p-4 shadow-[0_20px_50px_rgba(0,0,0,0.5)] transition-all duration-300"
                     >
                         <div className="flex items-start gap-3">
                             <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400 shrink-0">
@@ -340,7 +352,6 @@ export default function CaffeOSLayout({
                                 <X className="w-4 h-4" />
                             </button>
                         </div>
-                        {/* Progress Bar Mundur 4 Detik */}
                         <div className="absolute bottom-0 left-0 h-1 bg-gradient-to-r from-emerald-400 to-teal-500 animate-[toast-progress_4.2s_linear_forwards]" />
                     </div>
                 ))}
@@ -353,7 +364,6 @@ export default function CaffeOSLayout({
                 style={{ width: `${sidebarWidth}px` }}
                 className={`fixed inset-y-0 left-0 flex flex-col z-40 shadow-[15px_0_40px_rgba(0,0,0,0.45)] select-none transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] ${currentTheme.sidebar}`}
             >
-                {/* Dekorasi Ambient Glow */}
                 {activeSlug !== "neo-brutal" && (
                     <>
                         <div className="absolute top-0 left-0 w-64 h-64 bg-emerald-600/10 rounded-full blur-[90px] pointer-events-none -translate-x-1/2 -translate-y-1/2" />
@@ -403,7 +413,7 @@ export default function CaffeOSLayout({
                     </Link>
                 </div>
 
-                {/* Daftar Menu Berkelompok (Anti-Kepotong Saat Minimize 80px) */}
+                {/* Daftar Menu Berkelompok */}
                 <nav
                     className={`flex-1 py-4 overflow-y-auto custom-scrollbar space-y-5 relative z-10 ${
                         sidebarOpen ? "px-3" : "px-2"
@@ -451,7 +461,6 @@ export default function CaffeOSLayout({
                                                     : "opacity-75 hover:opacity-100 hover:bg-white/5 border border-transparent"
                                             }`}
                                         >
-                                            {/* Left Active Laser Bar */}
                                             {isActive && (
                                                 <div
                                                     className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 bg-gradient-to-b ${currentTheme.laserBar} rounded-r-full shadow-[0_0_12px_rgba(16,185,129,0.9)] ${
@@ -536,7 +545,6 @@ export default function CaffeOSLayout({
                 <div className="p-3 border-t border-slate-800/60 bg-black/30 relative z-20 shrink-0 space-y-2">
                     {sidebarOpen ? (
                         <>
-                            {/* Pintasan Uji Pindah Role Instan */}
                             <div className="grid grid-cols-3 gap-1 p-1 rounded-xl bg-black/40 border border-white/10 text-[9px] font-black">
                                 {["owner", "cashier", "barista"].map((r) => (
                                     <button
@@ -554,7 +562,6 @@ export default function CaffeOSLayout({
                                 ))}
                             </div>
 
-                            {/* Quantum Telemetry Dock */}
                             <div className="relative rounded-2xl p-3 bg-gradient-to-br from-slate-900/95 via-[#0A1128]/95 to-emerald-950/40 border border-slate-800/90 text-slate-200 shadow-inner overflow-hidden">
                                 <div className="absolute bottom-0 left-0 w-full h-[2px] bg-gradient-to-r from-emerald-500 via-indigo-500 to-amber-500 opacity-70" />
                                 <div className="flex items-center justify-between mb-2">
@@ -635,11 +642,9 @@ export default function CaffeOSLayout({
                 style={{ paddingLeft: `${sidebarWidth}px` }}
                 className="flex-1 flex flex-col min-w-0 transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]"
             >
-                {/* HEADER UTAMA DENGAN ANIMASI KOMET, TOGGLE SIDEBAR, LONCENG & PROFIL */}
                 <header
                     className={`sticky top-0 z-30 flex justify-between items-center py-3 px-4 sm:px-8 h-24 transition-all duration-300 relative overflow-visible ${currentTheme.header}`}
                 >
-                    {/* Animasi Lintas Komet Halus di Latar Header */}
                     <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
                         <div className="absolute top-1/2 -translate-y-1/2 w-full animate-[lintas-elegan_28s_linear_infinite]">
                             <div className="flex items-center opacity-50">
@@ -682,7 +687,6 @@ export default function CaffeOSLayout({
 
                     {/* KANAN: SWITCHER TEMA, PINTASAN QR, LONCENG NOTIFIKASI, & PROFIL DROPDOWN */}
                     <div className="flex items-center gap-3 sm:gap-4 relative z-10">
-                        {/* Switcher Template UI */}
                         {templates.length > 0 && (
                             <div className="hidden lg:flex items-center gap-1 bg-black/15 p-1.5 rounded-2xl border border-current/10">
                                 <Palette className="w-4 h-4 text-emerald-400 ml-1.5 mr-1" />
@@ -705,7 +709,6 @@ export default function CaffeOSLayout({
                             </div>
                         )}
 
-                        {/* Lonceng Notifikasi & Pintasan Simulasi QR Meja */}
                         <div className="relative" ref={notifRef}>
                             <button
                                 type="button"
@@ -781,7 +784,6 @@ export default function CaffeOSLayout({
                             )}
                         </div>
 
-                        {/* Avatar Profil Dropdown */}
                         <div className="relative" ref={profileRef}>
                             <button
                                 type="button"
@@ -844,7 +846,6 @@ export default function CaffeOSLayout({
                     </div>
                 </header>
 
-                {/* Konten Halaman */}
                 <main className="flex-1 overflow-y-auto">{children}</main>
             </div>
         </div>
