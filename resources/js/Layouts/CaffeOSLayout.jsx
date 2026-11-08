@@ -25,6 +25,8 @@ import {
     CheckCircle2,
     X,
     UserCog,
+    PieChart,
+    Megaphone,
 } from "lucide-react";
 
 export default function CaffeOSLayout({
@@ -36,7 +38,6 @@ export default function CaffeOSLayout({
     const userRole = auth.user?.role || "cashier";
     const activeSlug = auth.activeTemplate || "cyber-dark";
 
-    // State Buka/Tutup Sidebar (Expand 280px vs Minimize 80px) Tersimpan di LocalStorage
     const [sidebarOpen, setSidebarOpen] = useState(() => {
         const saved = localStorage.getItem("caffeos_sidebar_open");
         return saved !== null ? JSON.parse(saved) : true;
@@ -50,13 +51,11 @@ export default function CaffeOSLayout({
         );
     }, [sidebarOpen]);
 
-    // State Dropdown Lonceng Notifikasi & Profil di Header
     const [isNotifOpen, setIsNotifOpen] = useState(false);
     const [profileOpen, setProfileOpen] = useState(false);
     const notifRef = useRef(null);
     const profileRef = useRef(null);
 
-    // State Floating Toast Notification (Kanan Atas Otomatis Hilang 4 Detik)
     const [toasts, setToasts] = useState([]);
 
     const pushToast = (message, token = null, type = "success") => {
@@ -67,21 +66,18 @@ export default function CaffeOSLayout({
         }, 4200);
     };
 
-    // Tangkap Flash Message dari Backend Laravel & Munculkan sebagai Floating Toast Kanan Atas
     useEffect(() => {
         if (flash?.success) {
             pushToast(flash.success, flash.ai_token || null, "success");
         }
     }, [flash?.success, flash?.ai_token]);
 
-    // Jam Digital Real-Time untuk Quantum Telemetry Dock
     const [currentTime, setCurrentTime] = useState(new Date());
     useEffect(() => {
         const timer = setInterval(() => setCurrentTime(new Date()), 1000);
         return () => clearInterval(timer);
     }, []);
 
-    // Tutup Dropdown saat Klik di Luar
     useEffect(() => {
         const handleClickOutside = (e) => {
             if (notifRef.current && !notifRef.current.contains(e.target))
@@ -106,7 +102,6 @@ export default function CaffeOSLayout({
         year: "numeric",
     });
 
-    // Struktur Navigasi Berkelompok (Grouped Navigation) sesuai Role
     const navGroups = [
         {
             id: "executive",
@@ -134,6 +129,17 @@ export default function CaffeOSLayout({
                         "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
                     roles: ["owner"],
                 },
+                {
+                    name: "HPP & Menu Matrix",
+                    subtext: "COGS Resep & 4 Kuadran",
+                    href: route("menu-engineering.index"),
+                    active: route().current("menu-engineering.*"),
+                    icon: PieChart,
+                    badge: "Stats",
+                    badgeColor:
+                        "bg-cyan-500/15 text-cyan-300 border-cyan-500/30",
+                    roles: ["owner", "barista"],
+                },
             ],
         },
         {
@@ -149,6 +155,17 @@ export default function CaffeOSLayout({
                     badge: "POS",
                     badgeColor:
                         "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+                    roles: ["owner", "cashier"],
+                },
+                {
+                    name: "Loyalty & WA Blast",
+                    subtext: "Tukar Poin & Promo CRM",
+                    href: route("marketing.index"),
+                    active: route().current("marketing.*"),
+                    icon: Megaphone,
+                    badge: "CRM",
+                    badgeColor:
+                        "bg-amber-500/15 text-amber-300 border-amber-500/30",
                     roles: ["owner", "cashier"],
                 },
                 {
@@ -232,7 +249,6 @@ export default function CaffeOSLayout({
         },
     ];
 
-    // Tema Adaptif untuk Sidebar, Header, dan Content Wrapper
     const themeConfig = {
         "cyber-dark": {
             wrapper: "bg-slate-950 text-slate-100",
@@ -315,9 +331,7 @@ export default function CaffeOSLayout({
                 .custom-scrollbar::-webkit-scrollbar-thumb { background-color: rgba(16, 185, 129, 0.3); border-radius: 10px; }
             `}</style>
 
-            {/* =====================================================================
-                FLOATING TOAST NOTIFICATION (KANAN ATAS OTOMATIS MENGHILANG)
-            ===================================================================== */}
+            {/* FLOATING TOAST NOTIFICATION KANAN ATAS */}
             <div className="fixed top-5 right-5 z-[100] flex flex-col gap-3 max-w-sm w-full pointer-events-none">
                 {toasts.map((t) => (
                     <div
@@ -357,9 +371,7 @@ export default function CaffeOSLayout({
                 ))}
             </div>
 
-            {/* =====================================================================
-                1. COLLAPSIBLE SIDEBAR (PRESISI SAAT 280PX MAUPUN MINIMIZE 80PX)
-            ===================================================================== */}
+            {/* 1. COLLAPSIBLE SIDEBAR */}
             <aside
                 style={{ width: `${sidebarWidth}px` }}
                 className={`fixed inset-y-0 left-0 flex flex-col z-40 shadow-[15px_0_40px_rgba(0,0,0,0.45)] select-none transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] ${currentTheme.sidebar}`}
@@ -371,7 +383,6 @@ export default function CaffeOSLayout({
                     </>
                 )}
 
-                {/* Branding Header Sidebar */}
                 <div
                     className={`h-24 px-3 flex items-center justify-center relative shrink-0 z-20 ${currentTheme.sidebarHeader}`}
                 >
@@ -413,7 +424,6 @@ export default function CaffeOSLayout({
                     </Link>
                 </div>
 
-                {/* Daftar Menu Berkelompok */}
                 <nav
                     className={`flex-1 py-4 overflow-y-auto custom-scrollbar space-y-5 relative z-10 ${
                         sidebarOpen ? "px-3" : "px-2"
@@ -541,7 +551,7 @@ export default function CaffeOSLayout({
                     })}
                 </nav>
 
-                {/* Footer Sidebar: Quantum Telemetry Dock + Quick Role Switcher */}
+                {/* Footer Sidebar */}
                 <div className="p-3 border-t border-slate-800/60 bg-black/30 relative z-20 shrink-0 space-y-2">
                     {sidebarOpen ? (
                         <>
@@ -635,9 +645,7 @@ export default function CaffeOSLayout({
                 </div>
             </aside>
 
-            {/* =====================================================================
-                2. AREA KANAN: STICKY HEADER + KONTEN UTAMA
-            ===================================================================== */}
+            {/* 2. AREA KANAN: STICKY HEADER + KONTEN UTAMA */}
             <div
                 style={{ paddingLeft: `${sidebarWidth}px` }}
                 className="flex-1 flex flex-col min-w-0 transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]"
@@ -654,7 +662,6 @@ export default function CaffeOSLayout({
                         </div>
                     </div>
 
-                    {/* KIRI: TOMBOL TOGGLE SIDEBAR & IDENTITAS AKTIF */}
                     <div className="flex items-center gap-4 relative z-10">
                         <button
                             type="button"
@@ -685,7 +692,6 @@ export default function CaffeOSLayout({
                         </div>
                     </div>
 
-                    {/* KANAN: SWITCHER TEMA, PINTASAN QR, LONCENG NOTIFIKASI, & PROFIL DROPDOWN */}
                     <div className="flex items-center gap-3 sm:gap-4 relative z-10">
                         {templates.length > 0 && (
                             <div className="hidden lg:flex items-center gap-1 bg-black/15 p-1.5 rounded-2xl border border-current/10">

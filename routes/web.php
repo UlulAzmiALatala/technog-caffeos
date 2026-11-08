@@ -6,6 +6,8 @@ use App\Http\Controllers\GovernanceController;
 use App\Http\Controllers\HrAndFeedbackController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\ManagementController;
+use App\Http\Controllers\MarketingController;
+use App\Http\Controllers\MenuEngineeringController;
 use App\Http\Controllers\OwnerController;
 use App\Http\Controllers\PosController;
 use App\Http\Controllers\ProfileController;
@@ -56,7 +58,7 @@ Route::middleware(['auth', 'role:owner'])->group(function () {
     Route::post('/management/staffs', [ManagementController::class, 'storeStaff'])->name('management.staffs.store');
 });
 
-// 5. GRUP KHUSUS OWNER & CASHIER (Kasir POS, Shift Laci, Keuangan, Void Order, & Promo Voucher)
+// 5. GRUP KHUSUS OWNER & CASHIER (Kasir POS, Shift Laci, Keuangan, Loyalty Marketing WA, & Promo Voucher)
 Route::middleware(['auth', 'role:owner,cashier'])->group(function () {
     Route::get('/pos', [PosController::class, 'index'])->name('pos.index');
     Route::post('/pos/checkout', [PosController::class, 'checkout'])->name('pos.checkout');
@@ -64,6 +66,11 @@ Route::middleware(['auth', 'role:owner,cashier'])->group(function () {
 
     Route::post('/pos/shift/open', [PosController::class, 'openShift'])->name('pos.shift.open');
     Route::post('/pos/shift/close', [PosController::class, 'closeShift'])->name('pos.shift.close');
+
+    // Route Loyalty Point Member, Tukar Hadiah & WhatsApp Marketing Blast
+    Route::get('/marketing', [MarketingController::class, 'index'])->name('marketing.index');
+    Route::post('/marketing/redeem', [MarketingController::class, 'redeemPoints'])->name('marketing.redeem');
+    Route::post('/marketing/rewards', [MarketingController::class, 'storeReward'])->name('marketing.rewards.store');
 
     Route::get('/finance', [FinanceController::class, 'index'])->name('finance.index');
     Route::post('/finance/expenses', [FinanceController::class, 'storeExpense'])->name('finance.expenses.store');
@@ -75,8 +82,13 @@ Route::middleware(['auth', 'role:owner,cashier'])->group(function () {
     Route::delete('/management/vouchers/{voucher}', [ManagementController::class, 'destroyVoucher'])->name('management.vouchers.destroy');
 });
 
-// 6. GRUP KHUSUS OWNER & BARISTA (Gudang Supply Chain, PO Supplier, Stock Opname, & Input Resep Menu)
+// 6. GRUP KHUSUS OWNER & BARISTA (HPP Menu Engineering, Gudang Supply Chain, PO Supplier, & Input Resep)
 Route::middleware(['auth', 'role:owner,barista'])->group(function () {
+    // Route Kalkulator HPP Resep & Matriks Statistik Menu Engineering
+    Route::get('/menu-engineering', [MenuEngineeringController::class, 'index'])->name('menu-engineering.index');
+    Route::post('/menu-engineering/stock-costs', [MenuEngineeringController::class, 'updateStockCosts'])->name('menu-engineering.stocks.costs');
+    Route::post('/menu-engineering/menus/{menu}/price', [MenuEngineeringController::class, 'updateMenuPrice'])->name('menu-engineering.menus.price');
+
     Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory.index');
     Route::post('/inventory/suppliers', [InventoryController::class, 'storeSupplier'])->name('inventory.suppliers.store');
     Route::delete('/inventory/suppliers/{supplier}', [InventoryController::class, 'destroySupplier'])->name('inventory.suppliers.destroy');
