@@ -24,13 +24,15 @@ import {
     Clock,
     CheckCircle2,
     XCircle,
-    AlertTriangle,
     X,
     UserCog,
     PieChart,
     Megaphone,
     Flame,
     Wrench,
+    Bot,
+    Send,
+    Database,
 } from "lucide-react";
 
 export default function CaffeOSLayout({
@@ -38,7 +40,7 @@ export default function CaffeOSLayout({
     templates = [],
     tables = [],
 }) {
-    const { auth, flash, errors } = usePage().props;
+    const { auth, flash, errors, staffAiLogs = [] } = usePage().props;
     const userRole = auth.user?.role || "cashier";
     const activeSlug = auth.activeTemplate || "cyber-dark";
 
@@ -57,12 +59,15 @@ export default function CaffeOSLayout({
 
     const [isNotifOpen, setIsNotifOpen] = useState(false);
     const [profileOpen, setProfileOpen] = useState(false);
+    const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
+    const [aiPrompt, setAiPrompt] = useState("");
+    const [aiSending, setAiSending] = useState(false);
+
     const notifRef = useRef(null);
     const profileRef = useRef(null);
+    const aiScrollRef = useRef(null);
 
-    // =========================================================================
-    // UNIVERSAL FLOATING TOAST ENGINE (MENANGANI BERHASIL & GAGAL DI SEMUA HALAMAN)
-    // =========================================================================
+    // Universal Floating Toast Engine
     const [toasts, setToasts] = useState([]);
 
     const pushToast = (message, token = null, type = "success") => {
@@ -74,15 +79,6 @@ export default function CaffeOSLayout({
         }, 4500);
     };
 
-    // 1. Pantau setiap kali request Inertia selesai (Agar klik berulang dengan pesan sama tetap muncul Toast!)
-    useEffect(() => {
-        const removeFinishListener = router.on("finish", () => {
-            // Cek dilakukan via perubahan props di bawah
-        });
-        return () => removeFinishListener();
-    }, []);
-
-    // 2. Tangkap Flash Success & Flash Error dari Controller mana pun
     useEffect(() => {
         if (flash?.success) {
             pushToast(flash.success, flash.ai_token || null, "success");
@@ -92,7 +88,6 @@ export default function CaffeOSLayout({
         }
     }, [flash]);
 
-    // 3. Tangkap Error Validasi Form (Jika ada input kurang/salah saat klik Tambah/Simpan)
     useEffect(() => {
         const errorKeys = Object.keys(errors || {});
         if (errorKeys.length > 0) {
@@ -100,6 +95,12 @@ export default function CaffeOSLayout({
             pushToast(`Gagal Memproses: ${firstErrorMsg}`, null, "error");
         }
     }, [errors]);
+
+    useEffect(() => {
+        if (aiDrawerOpen && aiScrollRef.current) {
+            aiScrollRef.current.scrollTop = aiScrollRef.current.scrollHeight;
+        }
+    }, [staffAiLogs, aiDrawerOpen]);
 
     const [currentTime, setCurrentTime] = useState(new Date());
     useEffect(() => {
@@ -131,7 +132,47 @@ export default function CaffeOSLayout({
         year: "numeric",
     });
 
-    // Struktur Navigasi Lengkap Berkelompok sesuai Role
+    // Pertanyaan Pintas AI yang Disesuaikan dengan Role (Owner vs Cashier vs Barista)
+    const roleQuickPrompts =
+        {
+            owner: [
+                "Berapa omzet hari ini & estimasi laba bersih kita?",
+                "Cek stok bahan baku yang kritis/menipis di gudang!",
+                "Siapa staf yang sudah absen wajah hari ini?",
+                "Bagaimana status uang di laci shift kasir sekarang?",
+            ],
+            cashier: [
+                "Berapa total uang tunai yang seharusnya ada di laci shift saya?",
+                "Meja nomor berapa yang kosong & voucher apa yang aktif?",
+                "Siapa top member pelanggan kita saat ini?",
+                "Tampilkan daftar harga menu kopi & stoknya!",
+            ],
+            barista: [
+                "Antrean dapur nomor berapa saja yang belum selesai?",
+                "Tampilkan SOP takaran resep semua menu kopi!",
+                "Bahan baku apa saja yang stoknya menipis di gudang?",
+                "Menu apa yang paling laris terjual?",
+            ],
+        }[userRole] || [];
+
+    const handleSendAiPrompt = (customText = null) => {
+        const textToSend = customText ?? aiPrompt;
+        if (!textToSend.trim()) return;
+
+        setAiSending(true);
+        router.post(
+            route("ai.staff.ask"),
+            { prompt: textToSend },
+            {
+                preserveScroll: true,
+                onFinish: () => {
+                    setAiSending(false);
+                    setAiPrompt("");
+                },
+            },
+        );
+    };
+
     const navGroups = [
         {
             id: "executive",
@@ -380,7 +421,7 @@ export default function CaffeOSLayout({
                 .custom-scrollbar::-webkit-scrollbar-thumb { background-color: rgba(16, 185, 129, 0.3); border-radius: 10px; }
             `}</style>
 
-            {/* FLOATING TOAST NOTIFICATION KANAN ATAS (HIJAU UNTUK BERHASIL, MERAH UNTUK GAGAL/ERROR) */}
+            {/* FLOATING TOAST NOTIFICATION KANAN ATAS */}
             <div className="fixed top-5 right-5 z-[100] flex flex-col gap-3 max-w-sm w-full pointer-events-none">
                 {toasts.map((t) => {
                     const isError = t.type === "error";
@@ -452,6 +493,136 @@ export default function CaffeOSLayout({
                     );
                 })}
             </div>
+
+            {/* =====================================================================
+                SLIDE-OVER GLOBAL AI CO-WORKER DRAWER (MEMBACA DATABASE UNTUK SEMUA ROLE)
+            ===================================================================== */}
+            {aiDrawerOpen && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[90] flex justify-end">
+                    <div className="w-full max-w-md bg-slate-900 border-l border-slate-700 text-slate-100 h-full flex flex-col justify-between shadow-2xl">
+                        {/* Header Drawer AI */}
+                        <div className="p-5 border-b border-slate-800 bg-slate-950 flex justify-between items-center">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2.5 rounded-2xl bg-purple-500/20 border border-purple-500/40 text-purple-400">
+                                    <Bot className="w-6 h-6" />
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="font-black text-sm text-white">
+                                            AI Database Co-Worker
+                                        </h3>
+                                        <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[9px] font-black uppercase flex items-center gap-1">
+                                            <Database className="w-2.5 h-2.5" />{" "}
+                                            Live SQL
+                                        </span>
+                                    </div>
+                                    <p className="text-[11px] text-slate-400">
+                                        Asisten Pintar untuk{" "}
+                                        <strong>
+                                            {auth.user?.name} (
+                                            {userRole.toUpperCase()})
+                                        </strong>
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setAiDrawerOpen(false)}
+                                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+
+                        {/* Pintasan Pertanyaan Cepat Sesuai Role */}
+                        <div className="p-3.5 bg-slate-950/60 border-b border-slate-800 space-y-1.5">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-purple-400 block">
+                                ⚡ Klik Pertanyaan Database Cepat (
+                                {userRole.toUpperCase()}):
+                            </span>
+                            <div className="flex flex-wrap gap-1.5">
+                                {roleQuickPrompts.map((q, idx) => (
+                                    <button
+                                        key={idx}
+                                        type="button"
+                                        disabled={aiSending}
+                                        onClick={() => handleSendAiPrompt(q)}
+                                        className="text-left px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-purple-600/30 border border-slate-800 hover:border-purple-500/50 text-[11px] text-slate-200 transition"
+                                    >
+                                        {q}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Area Riwayat Percakapan AI */}
+                        <div
+                            ref={aiScrollRef}
+                            className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar"
+                        >
+                            {staffAiLogs.length === 0 ? (
+                                <div className="text-center py-12 px-4 space-y-2 text-xs text-slate-400">
+                                    <Sparkles className="w-8 h-8 text-purple-400 mx-auto" />
+                                    <p className="font-bold text-slate-200">
+                                        Saya Terhubung Langsung ke 12 Tabel
+                                        Database {auth.cafe?.name}!
+                                    </p>
+                                    <p>
+                                        Tanyakan omzet, laba bersih, isi uang
+                                        laci shift, resep kopi, stok kritis,
+                                        hingga staf yang hadir hari ini.
+                                    </p>
+                                </div>
+                            ) : (
+                                staffAiLogs.map((log) => (
+                                    <div
+                                        key={log.id}
+                                        className="space-y-2 text-xs"
+                                    >
+                                        <div className="bg-emerald-500/20 border border-emerald-500/40 text-emerald-200 p-3 rounded-2xl ml-auto max-w-[85%]">
+                                            <span className="text-[10px] font-black uppercase text-emerald-400 block mb-0.5">
+                                                {auth.user?.name} ({userRole}):
+                                            </span>
+                                            {log.prompt}
+                                        </div>
+                                        <div className="bg-slate-950 border border-purple-500/30 text-slate-200 p-3.5 rounded-2xl mr-auto max-w-[92%] whitespace-pre-line leading-relaxed">
+                                            <span className="text-[10px] font-black uppercase text-purple-400 flex items-center gap-1 mb-1">
+                                                <Bot className="w-3.5 h-3.5" />{" "}
+                                                AI Co-Worker (Live Database):
+                                            </span>
+                                            {log.response}
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+
+                        {/* Input Form Chat AI */}
+                        <form
+                            onSubmit={(e) => {
+                                e.preventDefault();
+                                handleSendAiPrompt();
+                            }}
+                            className="p-4 border-t border-slate-800 bg-slate-950 flex gap-2"
+                        >
+                            <input
+                                type="text"
+                                placeholder={`Tanya data kafe sebagai ${userRole.toUpperCase()}...`}
+                                value={aiPrompt}
+                                onChange={(e) => setAiPrompt(e.target.value)}
+                                className="flex-1 rounded-xl bg-slate-900 border-slate-700 text-xs text-white"
+                            />
+                            <button
+                                type="submit"
+                                disabled={aiSending}
+                                className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white font-black text-xs flex items-center gap-1.5"
+                            >
+                                <Send className="w-3.5 h-3.5" />{" "}
+                                {aiSending ? "..." : "Tanya"}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
 
             {/* 1. COLLAPSIBLE SIDEBAR */}
             <aside
@@ -775,8 +946,23 @@ export default function CaffeOSLayout({
                     </div>
 
                     <div className="flex items-center gap-3 sm:gap-4 relative z-10">
+                        {/* TOMBOL GLOBAL AI CO-WORKER (TERSEDIA UNTUK OWNER, CASHIER & BARISTA) */}
+                        <button
+                            type="button"
+                            onClick={() => setAiDrawerOpen(true)}
+                            className="px-3.5 py-2.5 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-xs flex items-center gap-2 shadow-lg shadow-purple-500/25 transition active:scale-95"
+                        >
+                            <Bot className="w-4 h-4" />
+                            <span className="hidden md:inline">
+                                AI Database Assistant
+                            </span>
+                            <span className="px-1.5 py-0.5 rounded bg-black/30 text-[9px] uppercase">
+                                {userRole}
+                            </span>
+                        </button>
+
                         {templates.length > 0 && (
-                            <div className="hidden lg:flex items-center gap-1 bg-black/15 p-1.5 rounded-2xl border border-current/10">
+                            <div className="hidden xl:flex items-center gap-1 bg-black/15 p-1.5 rounded-2xl border border-current/10">
                                 <Palette className="w-4 h-4 text-emerald-400 ml-1.5 mr-1" />
                                 {templates.map((tpl) => (
                                     <button

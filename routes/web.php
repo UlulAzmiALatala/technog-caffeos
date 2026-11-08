@@ -16,6 +16,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReservationController;
 use App\Http\Controllers\SuperAdminController;
 use App\Http\Controllers\TenantOnboardingController;
+use App\Http\Controllers\AiAssistantController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -57,6 +58,9 @@ Route::middleware(['auth', 'role:owner'])->group(function () {
     Route::post('/governance/pay-salary', [GovernanceController::class, 'disburseSalary'])->name('governance.pay-salary');
 
     Route::post('/management/staffs', [ManagementController::class, 'storeStaff'])->name('management.staffs.store');
+
+    // Ubah baris ini di dalam grup role:owner pada routes/web.php:
+    Route::post('/owner/ai-chat', [AiAssistantController::class, 'askStaffAi'])->name('owner.ask-ai');
 });
 
 // 5. GRUP KHUSUS OWNER & CASHIER (Kasir POS, Shift Laci, Keuangan, Loyalty Marketing WA, & Promo Voucher)
@@ -131,6 +135,9 @@ Route::middleware(['auth', 'role:owner,cashier,barista'])->group(function () {
     Route::post('/management/tables', [ManagementController::class, 'storeTable'])->name('management.tables.store');
     Route::post('/management/orders/{order}/status', [ManagementController::class, 'updateOrderStatus'])->name('management.orders.status');
     Route::post('/management/orders/{order}/driver', [ManagementController::class, 'assignDriver'])->name('management.orders.driver');
+
+    // Route Global AI Database Assistant untuk Owner, Cashier, & Barista
+    Route::post('/ai-assistant/ask', [AiAssistantController::class, 'askStaffAi'])->name('ai.staff.ask');
 });
 
 // 8. Grup Route Profile Bawaan Laravel Breeze
