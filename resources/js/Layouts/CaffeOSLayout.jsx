@@ -34,6 +34,8 @@ import {
     Send,
     Database,
     BellRing,
+    LineChart,
+    Briefcase,
 } from "lucide-react";
 
 export default function CaffeOSLayout({
@@ -51,6 +53,7 @@ export default function CaffeOSLayout({
     const userRole = auth.user?.role || "cashier";
     const activeSlug = auth.activeTemplate || "cyber-dark";
 
+    // State Buka/Tutup Sidebar (Expand 280px vs Minimize 80px) Tersimpan di LocalStorage
     const [sidebarOpen, setSidebarOpen] = useState(() => {
         const saved = localStorage.getItem("caffeos_sidebar_open");
         return saved !== null ? JSON.parse(saved) : true;
@@ -75,7 +78,9 @@ export default function CaffeOSLayout({
     const aiScrollRef = useRef(null);
     const knownCallIdsRef = useRef(new Set(activeWaiterCalls.map((c) => c.id)));
 
-    // Universal Floating Toast Engine
+    // =========================================================================
+    // UNIVERSAL FLOATING TOAST ENGINE (MENANGANI BERHASIL & GAGAL DI SEMUA HALAMAN)
+    // =========================================================================
     const [toasts, setToasts] = useState([]);
 
     const pushToast = (message, token = null, type = "success") => {
@@ -252,25 +257,17 @@ export default function CaffeOSLayout({
         );
     };
 
+    // =========================================================================
+    // STRUKTUR NAVIGASI BERURUTAN (DARI EKSEKUTIF -> KASIR -> DAPUR -> KEUANGAN/HR)
+    // =========================================================================
     const navGroups = [
         {
             id: "executive",
-            groupTitle: "Pusat Komando",
+            groupTitle: "01. Eksekutif & Analitik",
             items: [
                 {
-                    name: "Super Admin SaaS",
-                    subtext: "Kontrol Multi-Tenant HQ",
-                    href: route("superadmin.dashboard"),
-                    active: route().current("superadmin.*"),
-                    icon: Globe,
-                    badge: "HQ",
-                    badgeColor:
-                        "bg-purple-500/15 text-purple-300 border-purple-500/30",
-                    roles: ["owner"],
-                },
-                {
-                    name: "Executive Lounge",
-                    subtext: "Monitoring Omzet & AI",
+                    name: "1. Executive Lounge",
+                    subtext: "Dashboard Omzet & AI",
                     href: route("owner.dashboard"),
                     active: route().current("owner.*"),
                     icon: LayoutDashboard,
@@ -280,7 +277,18 @@ export default function CaffeOSLayout({
                     roles: ["owner"],
                 },
                 {
-                    name: "HPP & Menu Matrix",
+                    name: "2. Prediksi & Simulator",
+                    subtext: "Forecast Stok & Profit",
+                    href: route("analytics.index"),
+                    active: route().current("analytics.*"),
+                    icon: LineChart,
+                    badge: "Prediksi",
+                    badgeColor:
+                        "bg-amber-500/15 text-amber-300 border-amber-500/30",
+                    roles: ["owner"],
+                },
+                {
+                    name: "3. HPP & Menu Matrix",
                     subtext: "COGS Resep & 4 Kuadran",
                     href: route("menu-engineering.index"),
                     active: route().current("menu-engineering.*"),
@@ -290,14 +298,25 @@ export default function CaffeOSLayout({
                         "bg-cyan-500/15 text-cyan-300 border-cyan-500/30",
                     roles: ["owner", "barista"],
                 },
+                {
+                    name: "4. Super Admin SaaS",
+                    subtext: "Kontrol Multi-Tenant HQ",
+                    href: route("superadmin.dashboard"),
+                    active: route().current("superadmin.*"),
+                    icon: Globe,
+                    badge: "HQ",
+                    badgeColor:
+                        "bg-purple-500/15 text-purple-300 border-purple-500/30",
+                    roles: ["owner"],
+                },
             ],
         },
         {
             id: "frontoffice",
-            groupTitle: "Kasir & Layanan Meja",
+            groupTitle: "02. Kasir, Meja & CRM",
             items: [
                 {
-                    name: "Kasir POS Engine",
+                    name: "5. Kasir POS Engine",
                     subtext: "Transaksi & Shift Laci",
                     href: route("pos.index"),
                     active: route().current("pos.index"),
@@ -308,7 +327,26 @@ export default function CaffeOSLayout({
                     roles: ["owner", "cashier"],
                 },
                 {
-                    name: "Loyalty & WA Blast",
+                    name: "6. Denah & Reservasi",
+                    subtext: "Live Floor Plan Meja",
+                    href: route("reservations.index"),
+                    active: route().current("reservations.*"),
+                    icon: CalendarClock,
+                    roles: ["owner", "cashier", "barista"],
+                },
+                {
+                    name: "7. Co-Working & B2B",
+                    subtext: "Paket Nomad & Invoice",
+                    href: route("coworking.index"),
+                    active: route().current("coworking.*"),
+                    icon: Briefcase,
+                    badge: "B2B",
+                    badgeColor:
+                        "bg-purple-500/15 text-purple-300 border-purple-500/30",
+                    roles: ["owner", "cashier"],
+                },
+                {
+                    name: "8. Loyalty & WA Blast",
                     subtext: "Tukar Poin & Promo CRM",
                     href: route("marketing.index"),
                     active: route().current("marketing.*"),
@@ -319,15 +357,7 @@ export default function CaffeOSLayout({
                     roles: ["owner", "cashier"],
                 },
                 {
-                    name: "Denah & Reservasi",
-                    subtext: "Live Floor Plan Meja",
-                    href: route("reservations.index"),
-                    active: route().current("reservations.*"),
-                    icon: CalendarClock,
-                    roles: ["owner", "cashier", "barista"],
-                },
-                {
-                    name: "Layar TV Antrean",
+                    name: "9. Layar TV Antrean",
                     subtext: "Auto Voice Call Queue",
                     href: route("pos.queue-board"),
                     active: route().current("pos.queue-board"),
@@ -341,11 +371,11 @@ export default function CaffeOSLayout({
         },
         {
             id: "kitchen",
-            groupTitle: "Dapur & Rantai Pasok",
+            groupTitle: "03. Dapur, Resep & Gudang",
             items: [
                 {
-                    name: "Smart KDS Barista",
-                    subtext: "SLA Stopwatch & Resep",
+                    name: "10. Smart KDS Barista",
+                    subtext: "SLA Stopwatch & Racik",
                     href: route("kds.index"),
                     active: route().current("kds.*"),
                     icon: Flame,
@@ -355,15 +385,15 @@ export default function CaffeOSLayout({
                     roles: ["owner", "barista", "cashier"],
                 },
                 {
-                    name: "Dapur & Resep Menu",
-                    subtext: "Order, Promo & Member",
+                    name: "11. Katalog & Resep",
+                    subtext: "Master Menu & Voucher",
                     href: route("management.index"),
                     active: route().current("management.*"),
                     icon: ChefHat,
                     roles: ["owner", "barista", "cashier"],
                 },
                 {
-                    name: "Gudang & PO Supplier",
+                    name: "12. Gudang & PO Supplier",
                     subtext: "Supply Chain & Opname",
                     href: route("inventory.index"),
                     active: route().current("inventory.*"),
@@ -371,7 +401,7 @@ export default function CaffeOSLayout({
                     roles: ["owner", "barista"],
                 },
                 {
-                    name: "Mesin & Shift Roster",
+                    name: "13. Mesin & Shift Roster",
                     subtext: "Kalibrasi Alat & Jadwal",
                     href: route("operations.index"),
                     active: route().current("operations.*"),
@@ -382,10 +412,10 @@ export default function CaffeOSLayout({
         },
         {
             id: "governance",
-            groupTitle: "Keuangan & SDM Biometrik",
+            groupTitle: "04. Keuangan, SDM & CCTV",
             items: [
                 {
-                    name: "Ledger Keuangan",
+                    name: "14. Ledger Keuangan",
                     subtext: "Laba Bersih & Void Struk",
                     href: route("finance.index"),
                     active: route().current("finance.*"),
@@ -393,7 +423,7 @@ export default function CaffeOSLayout({
                     roles: ["owner", "cashier"],
                 },
                 {
-                    name: "Presensi Wajah & GPS",
+                    name: "15. Presensi Wajah & GPS",
                     subtext: "Biometrik Staf & Rating",
                     href: route("hr.index"),
                     active: route().current("hr.*"),
@@ -409,7 +439,7 @@ export default function CaffeOSLayout({
                     roles: ["owner", "cashier", "barista"],
                 },
                 {
-                    name: "Payroll & Audit CCTV",
+                    name: "16. Payroll & Audit CCTV",
                     subtext: "Slip Gaji & Log Aktivitas",
                     href: route("governance.index"),
                     active: route().current("governance.*"),
@@ -770,7 +800,7 @@ export default function CaffeOSLayout({
                             <div key={group.id} className="space-y-1.5">
                                 {sidebarOpen ? (
                                     <div className="px-3 mb-1.5 flex items-center gap-2">
-                                        <span className="text-[9px] font-black opacity-50 uppercase tracking-[0.2em]">
+                                        <span className="text-[9px] font-black opacity-50 uppercase tracking-[0.18em]">
                                             {group.groupTitle}
                                         </span>
                                         <div className="flex-1 h-[1px] bg-current opacity-10" />
@@ -944,7 +974,7 @@ export default function CaffeOSLayout({
                                             size={11}
                                             className="text-indigo-400 shrink-0"
                                         />
-                                        AI Engine Sync
+                                        16-Modules Sync
                                     </span>
                                     <span className="flex items-center gap-1 text-amber-300/90 uppercase">
                                         <ShieldCheck
@@ -1060,7 +1090,6 @@ export default function CaffeOSLayout({
                             </div>
                         )}
 
-                        {/* LONCENG NOTIFIKASI: MENAMPILKAN PANGGILAN MEJA PELANGGAN REAL-TIME & LINK QR */}
                         <div className="relative" ref={notifRef}>
                             {activeWaiterCalls.length > 0 && (
                                 <div className="absolute inset-0 bg-rose-500/40 rounded-2xl blur-md animate-pulse pointer-events-none" />
@@ -1123,7 +1152,6 @@ export default function CaffeOSLayout({
                                         </button>
                                     </div>
 
-                                    {/* Daftar Panggilan Pelayan (Smart Waiter Call) di Dropdown Header */}
                                     <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
                                         {activeWaiterCalls.length === 0 ? (
                                             <p className="text-center py-4 text-xs opacity-60">
@@ -1257,7 +1285,7 @@ export default function CaffeOSLayout({
                     </div>
                 </header>
 
-                {/* GLOBAL STICKY BAR PANGGILAN MEJA PELANGGAN (MUNCUL DI SEMUA HALAMAN ADMIN SAAT ADA WAITER CALL) */}
+                {/* GLOBAL STICKY BAR PANGGILAN MEJA PELANGGAN */}
                 {activeWaiterCalls.length > 0 && (
                     <div className="bg-gradient-to-r from-amber-500/25 via-rose-500/20 to-amber-500/25 border-b border-amber-500/50 px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs">
                         <div className="flex items-center gap-2 font-black text-amber-300">
