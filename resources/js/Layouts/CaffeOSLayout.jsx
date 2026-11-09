@@ -37,6 +37,8 @@ import {
     LineChart,
     Briefcase,
     Gauge,
+    FileText,
+    Ticket,
 } from "lucide-react";
 
 export default function CaffeOSLayout({
@@ -254,7 +256,7 @@ export default function CaffeOSLayout({
     };
 
     // =========================================================================
-    // STRUKTUR NAVIGASI TERURUT SESUAI PENGELOMPOKAN DIVISI (TANPA ANGKA NOMOR)
+    // STRUKTUR NAVIGASI TERURUT RAPI SESUAI KELOMPOK (TANPA ANGKA NOMOR)
     // =========================================================================
     const navGroups = [
         {
@@ -356,7 +358,7 @@ export default function CaffeOSLayout({
         },
         {
             id: "commercial",
-            groupTitle: "Co-Working & Pemasaran",
+            groupTitle: "Co-Working, Event & CRM",
             items: [
                 {
                     name: "Co-Working & B2B Pass",
@@ -367,6 +369,17 @@ export default function CaffeOSLayout({
                     badge: "B2B",
                     badgeColor:
                         "bg-purple-500/15 text-purple-300 border-purple-500/30",
+                    roles: ["owner", "cashier"],
+                },
+                {
+                    name: "Event & Tiket Workshop",
+                    subtext: "Komunitas & Pass Acara",
+                    href: route("events.index"),
+                    active: route().current("events.*"),
+                    icon: Ticket,
+                    badge: "Event",
+                    badgeColor:
+                        "bg-pink-500/15 text-pink-300 border-pink-500/30",
                     roles: ["owner", "cashier"],
                 },
                 {
@@ -444,6 +457,17 @@ export default function CaffeOSLayout({
                     href: route("finance.index"),
                     active: route().current("finance.*"),
                     icon: WalletCards,
+                    roles: ["owner", "cashier"],
+                },
+                {
+                    name: "Tutup Buku & Z-Report",
+                    subtext: "Pajak PB1 & Laba Rugi A4",
+                    href: route("reports.index"),
+                    active: route().current("reports.*"),
+                    icon: FileText,
+                    badge: "Z-Report",
+                    badgeColor:
+                        "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
                     roles: ["owner", "cashier"],
                 },
                 {
@@ -557,10 +581,31 @@ export default function CaffeOSLayout({
                 .custom-scrollbar::-webkit-scrollbar { width: 4px; }
                 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
                 .custom-scrollbar::-webkit-scrollbar-thumb { background-color: rgba(16, 185, 129, 0.3); border-radius: 10px; }
+
+                /* ATURAN CETAK A4 BERSIH: SEMBUNYIKAN SIDEBAR & HEADER, RESET PADDING KE 0PX */
+                @media print {
+                    @page {
+                        size: A4 portrait;
+                        margin: 10mm;
+                    }
+                    body, html {
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                        background: #ffffff !important;
+                    }
+                    .no-print {
+                        display: none !important;
+                    }
+                    .print-full-width {
+                        padding-left: 0 !important;
+                        margin-left: 0 !important;
+                        width: 100% !important;
+                    }
+                }
             `}</style>
 
             {/* FLOATING TOAST NOTIFICATION KANAN ATAS */}
-            <div className="fixed top-5 right-5 z-[100] flex flex-col gap-3 max-w-sm w-full pointer-events-none">
+            <div className="no-print print:hidden fixed top-5 right-5 z-[100] flex flex-col gap-3 max-w-sm w-full pointer-events-none">
                 {toasts.map((t) => {
                     const isError = t.type === "error";
                     return (
@@ -634,7 +679,7 @@ export default function CaffeOSLayout({
 
             {/* SLIDE-OVER GLOBAL AI CO-WORKER DRAWER */}
             {aiDrawerOpen && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[90] flex justify-end">
+                <div className="no-print print:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[90] flex justify-end">
                     <div className="w-full max-w-md bg-slate-900 border-l border-slate-700 text-slate-100 h-full flex flex-col justify-between shadow-2xl">
                         <div className="p-5 border-b border-slate-800 bg-slate-950 flex justify-between items-center">
                             <div className="flex items-center gap-3">
@@ -756,10 +801,10 @@ export default function CaffeOSLayout({
                 </div>
             )}
 
-            {/* 1. COLLAPSIBLE SIDEBAR */}
+            {/* 1. COLLAPSIBLE SIDEBAR (DISEMBUNYIKAN OTOMATIS SAAT PRINT KERTAS A4) */}
             <aside
                 style={{ width: `${sidebarWidth}px` }}
-                className={`fixed inset-y-0 left-0 flex flex-col z-40 shadow-[15px_0_40px_rgba(0,0,0,0.45)] select-none transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] ${currentTheme.sidebar}`}
+                className={`no-print print:hidden fixed inset-y-0 left-0 flex flex-col z-40 shadow-[15px_0_40px_rgba(0,0,0,0.45)] select-none transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] ${currentTheme.sidebar}`}
             >
                 {activeSlug !== "neo-brutal" && (
                     <>
@@ -998,7 +1043,7 @@ export default function CaffeOSLayout({
                                             size={11}
                                             className="text-indigo-400 shrink-0"
                                         />
-                                        18-Modules Sync
+                                        20-Modules Sync
                                     </span>
                                     <span className="flex items-center gap-1 text-amber-300/90 uppercase">
                                         <ShieldCheck
@@ -1030,13 +1075,13 @@ export default function CaffeOSLayout({
                 </div>
             </aside>
 
-            {/* 2. AREA KANAN: STICKY HEADER + GLOBAL WAITER CALL BANNER + KONTEN UTAMA */}
+            {/* 2. AREA KANAN: OTOMATIS FULL-WIDTH (PADDING 0PX) SAAT PRINT KERTAS A4 */}
             <div
                 style={{ paddingLeft: `${sidebarWidth}px` }}
-                className="flex-1 flex flex-col min-w-0 transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]"
+                className="print-full-width print:!pl-0 flex-1 flex flex-col min-w-0 transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]"
             >
                 <header
-                    className={`sticky top-0 z-30 flex justify-between items-center py-3 px-4 sm:px-8 h-24 transition-all duration-300 relative overflow-visible ${currentTheme.header}`}
+                    className={`no-print print:hidden sticky top-0 z-30 flex justify-between items-center py-3 px-4 sm:px-8 h-24 transition-all duration-300 relative overflow-visible ${currentTheme.header}`}
                 >
                     <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
                         <div className="absolute top-1/2 -translate-y-1/2 w-full animate-[lintas-elegan_28s_linear_infinite]">
@@ -1311,7 +1356,7 @@ export default function CaffeOSLayout({
 
                 {/* GLOBAL STICKY BAR PANGGILAN MEJA PELANGGAN */}
                 {activeWaiterCalls.length > 0 && (
-                    <div className="bg-gradient-to-r from-amber-500/25 via-rose-500/20 to-amber-500/25 border-b border-amber-500/50 px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs">
+                    <div className="no-print print:hidden bg-gradient-to-r from-amber-500/25 via-rose-500/20 to-amber-500/25 border-b border-amber-500/50 px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs">
                         <div className="flex items-center gap-2 font-black text-amber-300">
                             <BellRing className="w-4 h-4 animate-bounce text-amber-400" />
                             <span>
@@ -1349,7 +1394,9 @@ export default function CaffeOSLayout({
                     </div>
                 )}
 
-                <main className="flex-1 overflow-y-auto">{children}</main>
+                <main className="flex-1 overflow-y-auto print:overflow-visible">
+                    {children}
+                </main>
             </div>
         </div>
     );

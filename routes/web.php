@@ -4,6 +4,7 @@ use App\Http\Controllers\AiAssistantController;
 use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\CoworkingController;
 use App\Http\Controllers\CustomerOrderController;
+use App\Http\Controllers\EventHubController;
 use App\Http\Controllers\FinanceController;
 use App\Http\Controllers\GovernanceController;
 use App\Http\Controllers\HrAndFeedbackController;
@@ -21,6 +22,7 @@ use App\Http\Controllers\ReservationController;
 use App\Http\Controllers\RoasteryController;
 use App\Http\Controllers\SuperAdminController;
 use App\Http\Controllers\TenantOnboardingController;
+use App\Http\Controllers\ZReportController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -66,7 +68,7 @@ Route::middleware(['auth', 'role:owner'])->group(function () {
     Route::post('/management/staffs', [ManagementController::class, 'storeStaff'])->name('management.staffs.store');
 });
 
-// 5. GRUP KHUSUS OWNER & CASHIER (Kasir POS, Studio QR Meja, Co-Working B2B, Loyalty WA & Ledger Keuangan)
+// 5. GRUP KHUSUS OWNER & CASHIER (Kasir POS, Studio QR, Co-Working, Event, Loyalty WA, Keuangan & Z-Report)
 Route::middleware(['auth', 'role:owner,cashier'])->group(function () {
     Route::get('/pos', [PosController::class, 'index'])->name('pos.index');
     Route::post('/pos/checkout', [PosController::class, 'checkout'])->name('pos.checkout');
@@ -74,13 +76,17 @@ Route::middleware(['auth', 'role:owner,cashier'])->group(function () {
     Route::post('/pos/shift/open', [PosController::class, 'openShift'])->name('pos.shift.open');
     Route::post('/pos/shift/close', [PosController::class, 'closeShift'])->name('pos.shift.close');
 
-    // Studio Desain & Cetak Standee QR Code Meja Akrilik
     Route::get('/qr-studio', [QrStudioController::class, 'index'])->name('qr-studio.index');
     Route::post('/qr-studio/tables/{table}/regenerate', [QrStudioController::class, 'regenerateQr'])->name('qr-studio.regenerate');
 
     Route::get('/coworking', [CoworkingController::class, 'index'])->name('coworking.index');
     Route::post('/coworking/packages', [CoworkingController::class, 'storePackage'])->name('coworking.packages.store');
     Route::post('/coworking/checkout', [CoworkingController::class, 'checkoutPackage'])->name('coworking.checkout');
+
+    // Manajemen Event Komunitas & Tiket Workshop Barista
+    Route::get('/events', [EventHubController::class, 'index'])->name('events.index');
+    Route::post('/events', [EventHubController::class, 'storeEvent'])->name('events.store');
+    Route::post('/events/tickets/sell', [EventHubController::class, 'sellTicket'])->name('events.tickets.sell');
 
     Route::get('/marketing', [MarketingController::class, 'index'])->name('marketing.index');
     Route::post('/marketing/redeem', [MarketingController::class, 'redeemPoints'])->name('marketing.redeem');
@@ -90,6 +96,9 @@ Route::middleware(['auth', 'role:owner,cashier'])->group(function () {
     Route::post('/finance/expenses', [FinanceController::class, 'storeExpense'])->name('finance.expenses.store');
     Route::delete('/finance/expenses/{expense}', [FinanceController::class, 'destroyExpense'])->name('finance.expenses.destroy');
     Route::post('/finance/orders/{order}/void', [FinanceController::class, 'voidOrder'])->name('finance.orders.void');
+
+    // Laporan Tutup Buku Harian (Z-Report), Pajak PB1 & Laba Rugi Resmi Siap Cetak A4
+    Route::get('/reports', [ZReportController::class, 'index'])->name('reports.index');
 
     Route::post('/management/vouchers', [ManagementController::class, 'storeVoucher'])->name('management.vouchers.store');
     Route::post('/management/vouchers/{voucher}/toggle', [ManagementController::class, 'toggleVoucher'])->name('management.vouchers.toggle');
@@ -102,7 +111,6 @@ Route::middleware(['auth', 'role:owner,barista'])->group(function () {
     Route::post('/menu-engineering/stock-costs', [MenuEngineeringController::class, 'updateStockCosts'])->name('menu-engineering.stocks.costs');
     Route::post('/menu-engineering/menus/{menu}/price', [MenuEngineeringController::class, 'updateMenuPrice'])->name('menu-engineering.menus.price');
 
-    // Roastery Batch Tracker & Kalibrasi Dial-In Espresso Harian
     Route::get('/roastery', [RoasteryController::class, 'index'])->name('roastery.index');
     Route::post('/roastery/batch', [RoasteryController::class, 'storeRoastBatch'])->name('roastery.batch.store');
     Route::post('/roastery/dial-in', [RoasteryController::class, 'storeDialInLog'])->name('roastery.dial-in.store');
