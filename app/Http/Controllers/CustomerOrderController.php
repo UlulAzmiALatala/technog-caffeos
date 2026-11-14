@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AiChatLog;
 use App\Models\AiToken;
 use App\Models\Customer;
+use App\Models\Delivery;
 use App\Models\DiningTable;
 use App\Models\Menu;
 use App\Models\Order;
@@ -13,6 +14,7 @@ use App\Models\Payment;
 use App\Models\Voucher;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 
@@ -23,7 +25,6 @@ class CustomerOrderController extends Controller
         $table = DiningTable::with('cafe.template')->where('qr_code', $qrCode)->firstOrFail();
         $cafeId = $table->cafe_id;
 
-        // Cari 3 ID Menu Paling Laris untuk diberi badge "BEST SELLER" di layar HP Pelanggan
         $bestSellerIds = OrderItem::select('menu_id', DB::raw('SUM(qty) as total_qty'))
             ->whereHas('order', function ($q) use ($cafeId) {
                 $q->where('cafe_id', $cafeId)->where('order_status', '!=', 'cancelled');
@@ -50,7 +51,8 @@ class CustomerOrderController extends Controller
     public function submitOrder(Request $request, $qrCode)
     {
         $table = DiningTable::with('cafe')->where('qr_code', $qrCode)->firstOrFail();
-        $cafeId = $table->cafe_id;
+        $cafe = $table->cafe;
+        $cafeId = $cafe->id;
 
         $validated = $request->validate([
             'customer_name' => 'required|string|max:150',
@@ -58,13 +60,23 @@ class CustomerOrderController extends Controller
             'order_type' => 'required|in:dine_in,takeaway,delivery',
             'payment_method' => 'required|in:cash,qris,ewallet',
             'voucher_id' => 'nullable|exists:vouchers,id',
+            'courier_brand' => 'nullable|string|max:60',
+            'delivery_address' => 'nullable|string|max:350',
+            'shipping_cost' => 'nullable|numeric|min:0',
             'items' => 'required|array|min:1',
             'items.*.menu_id' => 'required|exists:menus,id',
             'items.*.qty' => 'required|integer|min:1',
             'items.*.notes' => 'nullable|string|max:100',
         ]);
 
-        return DB::transaction(function () use ($validated, $table, $cafeId) {
+        // Validasi khusus jika IS DELIVERY ORDER == YES
+        if ($validated['order_type'] === 'delivery' && empty($validated['delivery_address'])) {
+            return back()->withErrors([
+                'delivery_address' => 'Mohon isi alamat lengkap pengiriman untuk pesanan Delivery Ojol!',
+            ]);
+        }
+
+        return DB::transaction(function () use ($validated, $table, $cafe, $cafeId) {
             $todayCount = Order::where('cafe_id', $cafeId)->whereDate('created_at', today())->count();
             $queueNumber = $todayCount + 1;
 
@@ -85,7 +97,6 @@ class CustomerOrderController extends Controller
                     'notes' => $item['notes'] ?? null,
                 ];
 
-                // Jika bayar non-tunai (QRIS/E-Wallet), otomatis langsung potong stok resep gudang
                 if ($validated['payment_method'] !== 'cash') {
                     foreach ($menu->stocks as $stock) {
                         $stock->decrement('current_qty', $stock->pivot->qty_needed * $item['qty']);
@@ -93,7 +104,6 @@ class CustomerOrderController extends Controller
                 }
             }
 
-            // Hitung potongan Voucher Promo jika pelanggan memilih voucher di HP
             $discountTotal = 0;
             if (!empty($validated['voucher_id'])) {
                 $voucher = Voucher::where('cafe_id', $cafeId)
@@ -110,9 +120,13 @@ class CustomerOrderController extends Controller
                 }
             }
 
-            $grandTotal = max(0, $subtotal - $discountTotal);
+            // Tambahkan Ongkos Kirim Ojol jika order_type === 'delivery'
+            $shippingCost = $validated['order_type'] === 'delivery'
+                ? (float) ($validated['shipping_cost'] ?? 12000)
+                : 0;
 
-            // Otomatis daftarkan/update Member CRM jika pelanggan mengisi nomor WhatsApp
+            $grandTotal = max(0, ($subtotal - $discountTotal) + $shippingCost);
+
             $customer = null;
             if (!empty($validated['customer_phone'])) {
                 $customer = Customer::firstOrCreate(
@@ -125,12 +139,13 @@ class CustomerOrderController extends Controller
             }
 
             $isOnlinePaid = $validated['payment_method'] !== 'cash';
+            $prefix = $validated['order_type'] === 'delivery' ? 'DLV-' : 'QR-';
 
             $order = Order::create([
                 'cafe_id' => $cafeId,
                 'customer_id' => $customer?->id,
-                'table_id' => $table->id,
-                'order_code' => 'QR-' . now()->format('Ymd') . '-' . strtoupper(Str::random(4)),
+                'table_id' => $validated['order_type'] === 'dine_in' ? $table->id : null,
+                'order_code' => $prefix . now()->format('Ymd') . '-' . strtoupper(Str::random(4)),
                 'queue_number' => $queueNumber,
                 'customer_name' => $validated['customer_name'],
                 'order_type' => $validated['order_type'],
@@ -142,9 +157,35 @@ class CustomerOrderController extends Controller
 
             $order->items()->createMany($itemsData);
 
-            // Jika Dine-In, otomatis ubah status meja di Denah Floor Plan menjadi 'occupied' (Terisi)
             if ($validated['order_type'] === 'dine_in') {
                 $table->update(['status' => 'occupied']);
+            }
+
+            // JIKA IS DELIVERY ORDER == YES, SIMPAN DATA PENGIRIMAN & KURIR OJOL
+            if ($validated['order_type'] === 'delivery') {
+                $settings = $cafe->settings ?? [];
+                $ojolMetaMap = $settings['ojol_dispatches'] ?? [];
+                $ojolMetaMap[$order->id] = [
+                    'courier_brand' => $validated['courier_brand'] ?? 'GoSend Instant',
+                    'shipping_cost' => $shippingCost,
+                    'delivery_address' => $validated['delivery_address'],
+                    'customer_phone' => $validated['customer_phone'] ?? '-',
+                    'driver_name' => null,
+                    'driver_phone' => null,
+                    'license_plate' => null,
+                    'delivery_status' => 'waiting_driver',
+                ];
+                $settings['ojol_dispatches'] = $ojolMetaMap;
+                $cafe->update(['settings' => $settings]);
+
+                if (Schema::hasTable('deliveries')) {
+                    $cols = Schema::getColumnListing('deliveries');
+                    $dlvData = ['order_id' => $order->id];
+                    if (in_array('recipient_address', $cols)) $dlvData['recipient_address'] = $validated['delivery_address'];
+                    if (in_array('delivery_cost', $cols)) $dlvData['delivery_cost'] = $shippingCost;
+                    if (in_array('delivery_status', $cols)) $dlvData['delivery_status'] = 'pending';
+                    Delivery::create($dlvData);
+                }
             }
 
             Payment::create([
@@ -156,7 +197,7 @@ class CustomerOrderController extends Controller
             ]);
 
             if ($isOnlinePaid) {
-                $quota = (int) ($table->cafe->settings['ai_quota_per_order'] ?? 5);
+                $quota = (int) ($cafe->settings['ai_quota_per_order'] ?? 5);
                 AiToken::create([
                     'cafe_id' => $cafeId,
                     'order_id' => $order->id,
@@ -169,13 +210,13 @@ class CustomerOrderController extends Controller
 
             return redirect()
                 ->route('customer.order-status', $order->order_code)
-                ->with('success', "Pesanan Antrean #{$order->queue_number} berhasil dikirim ke Dapur Barista!");
+                ->with('success', "Pesanan Antrean #{$order->queue_number} berhasil diteruskan ke sistem!");
         });
     }
 
     public function orderStatus($orderCode)
     {
-        $order = Order::with(['items.menu', 'payment', 'aiToken', 'table', 'cafe.template', 'customer'])
+        $order = Order::with(['items.menu', 'payment', 'aiToken', 'table', 'cafe.template', 'customer', 'delivery'])
             ->where('order_code', $orderCode)
             ->firstOrFail();
 
@@ -183,8 +224,11 @@ class CustomerOrderController extends Controller
             ? AiChatLog::where('ai_token_id', $order->aiToken->id)->latest()->get()->reverse()->values()
             : [];
 
+        $ojolInfo = $order->cafe?->settings['ojol_dispatches'][$order->id] ?? null;
+
         return Inertia::render('Customer/OrderStatusAndAi', [
             'order' => $order,
+            'ojolInfo' => $ojolInfo,
             'chatLogs' => $chatLogs,
             'activeTemplate' => $order->cafe?->template?->slug ?? 'cyber-dark',
         ]);
@@ -220,22 +264,20 @@ class CustomerOrderController extends Controller
         $wifiPass = $cafe->settings['wifi_password'] ?? 'kopitechnog123';
 
         $systemInstruction = "Kamu adalah AI Co-Worker & Teman Nongkrong Pintar untuk pelanggan bernama {$order->customer_name} di kafe '{$cafe->name}'.
-Data Pesanan Pelanggan Saat Ini: Antrean #{$order->queue_number}, Status Dapur: " . strtoupper($order->order_status) . ", Item: {$myItemsText}.
+Data Pesanan Pelanggan Saat Ini: Antrean #{$order->queue_number}, Tipe: {$order->order_type}, Status Dapur: " . strtoupper($order->order_status) . ", Item: {$myItemsText}.
 Password WiFi Kafe: {$wifiPass}. Promo Aktif: {$vouchersText}. Daftar Menu Kafe: {$menuListText}.
 
 ATURAN MENJAWAB:
-1. Jika pelanggan bertanya tentang pesanan mereka, menu kopi, harga, promo, atau WiFi kafe, jawab dengan data akurat di atas.
+1. Jika pelanggan bertanya tentang pesanan mereka, pengiriman ojol, menu kopi, harga, promo, atau WiFi kafe, jawab dengan data akurat di atas.
 2. Jika pelanggan bertanya tentang topik umum apa pun (berita politik, tugas kuliah, coding, bisnis, sejarah, sains, atau curhat), jawablah secara bebas, cerdas, mendalam, dan ramah dalam Bahasa Indonesia!";
 
         $reply = AiAssistantController::callExternalAi($systemInstruction, $prompt);
 
         if (!$reply) {
-            if (preg_match('/\b(status|pesanan|antrean|kapan|lama)\b/i', $qLower)) {
+            if (preg_match('/\b(status|pesanan|antrean|ojol|kurir|driver)\b/i', $qLower)) {
                 $reply = "Halo Kak {$order->customer_name}! Pesanan Anda **Antrean #{$order->queue_number}** ({$myItemsText}) saat ini berstatus **" . strtoupper($order->order_status) . "**.";
             } elseif (preg_match('/\b(wifi|internet|password|sandi)\b/i', $qLower)) {
                 $reply = "📶 Password Free WiFi di **{$cafe->name}** adalah: **`{$wifiPass}`**.";
-            } elseif (preg_match('/\b(promo|diskon|voucher)\b/i', $qLower)) {
-                $reply = "🏷️ Promo aktif di **{$cafe->name}**: **{$vouchersText}**.";
             } else {
                 $reply = "☕ Halo Kak {$order->customer_name}! Pesanan **#{$order->queue_number}** ({$myItemsText}) sedang berstatus **" . strtoupper($order->order_status) . "**. Password WiFi kami: **`{$wifiPass}`**.";
             }

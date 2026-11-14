@@ -20,10 +20,14 @@ import {
     Users,
     Calculator,
     Share2,
+    Truck,
+    MapPin,
+    PhoneCall,
 } from "lucide-react";
 
 export default function OrderStatusAndAi({
     order,
+    ojolInfo = null,
     chatLogs = [],
     activeTemplate = "cyber-dark",
 }) {
@@ -35,7 +39,7 @@ export default function OrderStatusAndAi({
 
     // State Kalkulator Split Bill (Patungan Nongkrong)
     const [splitCount, setSplitCount] = useState(2);
-    const [splitMode, setSplitMode] = useState("equal"); // 'equal' | 'items'
+    const [splitMode, setSplitMode] = useState("equal");
     const [selectedMyItems, setSelectedMyItems] = useState({});
 
     const prevStatusRef = useRef(order.order_status);
@@ -53,11 +57,11 @@ export default function OrderStatusAndAi({
         }
     }, [chatLogs]);
 
-    // Auto-Sync Setiap 5 Detik & Bunyikan Panggilan Suara Saat Status Berubah Jadi "READY"
+    // Auto-Sync Setiap 5 Detik (Memantau Status Dapur & Status Driver Ojol)
     useEffect(() => {
         const interval = setInterval(() => {
             router.reload({
-                only: ["order", "chatLogs"],
+                only: ["order", "ojolInfo", "chatLogs"],
                 preserveScroll: true,
                 onSuccess: (page) => {
                     const newStatus = page.props.order?.order_status;
@@ -68,7 +72,7 @@ export default function OrderStatusAndAi({
                         prevStatusRef.current = "ready";
                         if ("speechSynthesis" in window) {
                             const u = new SpeechSynthesisUtterance(
-                                `Halo Kak ${order.customer_name}, pesanan antrean nomor ${order.queue_number} Anda sudah siap disajikan!`,
+                                `Halo Kak ${order.customer_name}, pesanan antrean nomor ${order.queue_number} Anda sudah siap!`,
                             );
                             u.lang = "id-ID";
                             window.speechSynthesis.speak(u);
@@ -120,7 +124,6 @@ export default function OrderStatusAndAi({
         );
     };
 
-    // Hitung Nominal Split Bill
     const grandTotal = Number(order.grand_total || 0);
     const equalPerPerson = Math.ceil(grandTotal / Math.max(1, splitCount));
 
@@ -146,7 +149,7 @@ export default function OrderStatusAndAi({
                 : `*Bagian Pilihan Saya:* Rp ${mySelectedTotal.toLocaleString("id-ID")}`;
 
         const text =
-            `☕ *Tagihan Patungan Nongkrong - ${order.cafe?.name}*\n` +
+            `☕ *Tagihan Patungan - ${order.cafe?.name}*\n` +
             `No. Struk: ${order.order_code} (Antrean #${order.queue_number})\n\n` +
             `*Rincian Pesanan:*\n${itemLines}\n\n` +
             `*Grand Total:* Rp ${grandTotal.toLocaleString("id-ID")}\n` +
@@ -159,7 +162,14 @@ export default function OrderStatusAndAi({
         { key: "pending", label: "Validasi Kasir", icon: Clock },
         { key: "paid", label: "Antrean Dapur", icon: CheckCircle2 },
         { key: "processing", label: "Sedang Diracik", icon: ChefHat },
-        { key: "ready", label: "Siap Saji!", icon: Coffee },
+        {
+            key: "ready",
+            label:
+                order.order_type === "delivery"
+                    ? "Diantar Ojol!"
+                    : "Siap Saji!",
+            icon: Coffee,
+        },
     ];
 
     const currentStepIdx = steps.findIndex((s) => s.key === order.order_status);
@@ -178,6 +188,13 @@ export default function OrderStatusAndAi({
         : isWood
           ? "rounded-2xl bg-amber-50/70 border-stone-300 text-stone-800 text-xs"
           : "rounded-2xl bg-slate-950 border-slate-800 text-white text-xs";
+
+    const ojolStatusLabels = {
+        waiting_driver: "⏳ Mencari Driver Ojol Terdekat...",
+        driver_assigned: "🛵 Driver Ojol Menuju Kafe untuk Pickup",
+        on_the_way: "🚀 Pesanan Sedang Diantar Driver ke Alamatmu!",
+        delivered: "✅ Pesanan Telah Tiba di Tujuan!",
+    };
 
     return (
         <CustomerLayout
@@ -214,7 +231,7 @@ export default function OrderStatusAndAi({
                             <p className="text-xs opacity-80 mt-1">
                                 Pemesan: <strong>{order.customer_name}</strong>{" "}
                                 •{" "}
-                                <span className="uppercase">
+                                <span className="uppercase font-extrabold text-amber-400">
                                     {order.order_type}
                                 </span>
                                 {order.table &&
@@ -246,6 +263,71 @@ export default function OrderStatusAndAi({
                             </button>
                         </div>
                     </div>
+
+                    {/* KARTU KHUSUS TRACKING PENGIRIMAN OJOL (JIKA ORDER_TYPE === 'delivery') */}
+                    {order.order_type === "delivery" && (
+                        <div className="p-4 rounded-2xl bg-amber-500/15 border-2 border-amber-500/50 space-y-3 text-xs">
+                            <div className="flex flex-wrap justify-between items-center gap-2">
+                                <span className="px-2.5 py-1 rounded-full bg-amber-400 text-slate-950 font-black uppercase text-[10px] flex items-center gap-1">
+                                    <Truck className="w-3.5 h-3.5" />{" "}
+                                    {ojolInfo?.courier_brand || "Delivery Ojol"}
+                                </span>
+                                <span className="font-black text-amber-300 text-sm">
+                                    {
+                                        ojolStatusLabels[
+                                            ojolInfo?.delivery_status ||
+                                                "waiting_driver"
+                                        ]
+                                    }
+                                </span>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-amber-500/30">
+                                <div>
+                                    <span className="text-[10px] uppercase opacity-70 block">
+                                        Alamat Tujuan Pengiriman:
+                                    </span>
+                                    <p className="font-bold flex items-start gap-1 mt-0.5">
+                                        <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                                        <span>
+                                            {ojolInfo?.delivery_address ||
+                                                "Alamat telah tercatat di sistem"}
+                                        </span>
+                                    </p>
+                                </div>
+
+                                <div className="sm:text-right">
+                                    <span className="text-[10px] uppercase opacity-70 block">
+                                        Identitas Driver Ojol:
+                                    </span>
+                                    {ojolInfo?.driver_name ? (
+                                        <div className="space-y-1 mt-0.5">
+                                            <p className="font-black text-sm text-emerald-400">
+                                                🛵 {ojolInfo.driver_name} (
+                                                {ojolInfo.license_plate})
+                                            </p>
+                                            {ojolInfo.driver_phone && (
+                                                <a
+                                                    href={`https://wa.me/${ojolInfo.driver_phone.replace(/^0/, "62")}`}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="inline-flex items-center gap-1 px-3 py-1 rounded-xl bg-emerald-500 text-slate-950 font-black text-[11px]"
+                                                >
+                                                    <PhoneCall className="w-3 h-3" />{" "}
+                                                    Chat WA Driver ↗
+                                                </a>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <p className="italic opacity-75 mt-0.5">
+                                            Menunggu Kasir/Dapur menugaskan
+                                            Driver Ojol...
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Kotak Status Kunci Free WiFi Kafe */}
                     <div
@@ -285,8 +367,8 @@ export default function OrderStatusAndAi({
                                         Password Free WiFi & AI Co-Worker
                                         Terkunci:
                                     </strong>{" "}
-                                    Akan terbuka otomatis di layar ini begitu
-                                    pembayaran Anda divalidasi oleh Kasir.
+                                    Akan terbuka otomatis begitu pembayaran
+                                    divalidasi oleh Kasir.
                                 </span>
                             </div>
                         )}
@@ -319,29 +401,31 @@ export default function OrderStatusAndAi({
                         })}
                     </div>
 
-                    {/* Smart Waiter Call */}
-                    <div className="pt-3 border-t border-current/10 flex flex-wrap items-center justify-between gap-2 text-xs">
-                        <span className="font-bold flex items-center gap-1.5 text-amber-500">
-                            <BellRing className="w-4 h-4" /> Panggil Pelayan ke
-                            Meja:
-                        </span>
-                        <div className="flex flex-wrap gap-1.5">
-                            {[
-                                "🛎️ Panggil Pelayan",
-                                "🧻 Minta Tisu / Sendok",
-                                "🧹 Bersihkan Meja",
-                            ].map((act) => (
-                                <button
-                                    key={act}
-                                    type="button"
-                                    onClick={() => handleWaiterCall(act)}
-                                    className="px-3 py-1.5 rounded-xl bg-black/15 hover:bg-amber-500 hover:text-slate-950 border border-current/15 font-bold transition"
-                                >
-                                    {act}
-                                </button>
-                            ))}
+                    {/* Smart Waiter Call (Hanya tampil jika Dine-In di meja) */}
+                    {order.order_type === "dine_in" && (
+                        <div className="pt-3 border-t border-current/10 flex flex-wrap items-center justify-between gap-2 text-xs">
+                            <span className="font-bold flex items-center gap-1.5 text-amber-500">
+                                <BellRing className="w-4 h-4" /> Panggil Pelayan
+                                ke Meja:
+                            </span>
+                            <div className="flex flex-wrap gap-1.5">
+                                {[
+                                    "🛎️ Panggil Pelayan",
+                                    "🧻 Minta Tisu / Sendok",
+                                    "🧹 Bersihkan Meja",
+                                ].map((act) => (
+                                    <button
+                                        key={act}
+                                        type="button"
+                                        onClick={() => handleWaiterCall(act)}
+                                        className="px-3 py-1.5 rounded-xl bg-black/15 hover:bg-amber-500 hover:text-slate-950 border border-current/15 font-bold transition"
+                                    >
+                                        {act}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
 
                 {/* 2. WORKSPACE AI CHATBOT CO-WORKER */}
@@ -378,10 +462,10 @@ export default function OrderStatusAndAi({
                                 Kasir
                             </h3>
                             <p className="text-xs opacity-80 max-w-md mx-auto leading-relaxed">
-                                Silakan selesaikan pembayaran tunai untuk{" "}
-                                <strong>Antrean #{order.queue_number}</strong>{" "}
-                                di kasir. Begitu kasir menekan tombol Validasi,
-                                layar ini akan{" "}
+                                Silakan selesaikan pembayaran untuk{" "}
+                                <strong>Antrean #{order.queue_number}</strong>.
+                                Begitu kasir menekan tombol Validasi, layar ini
+                                akan{" "}
                                 <strong>
                                     otomatis membuka kunci WiFi & AI Co-Worker
                                 </strong>
@@ -474,7 +558,7 @@ export default function OrderStatusAndAi({
                     )}
                 </div>
 
-                {/* 3. FITUR BARU: SMART SPLIT BILL (KALKULATOR PATUNGAN NONGKRONG & SHARE WA) */}
+                {/* 3. SMART SPLIT BILL */}
                 <div className={`p-6 rounded-3xl space-y-4 ${cardClass}`}>
                     <div className="flex flex-wrap justify-between items-center gap-3 border-b border-current/10 pb-3">
                         <div className="flex items-center gap-2.5">
@@ -483,8 +567,7 @@ export default function OrderStatusAndAi({
                             </div>
                             <div>
                                 <h3 className="font-black text-sm">
-                                    Kalkulator Split Bill (Hitung Patungan
-                                    Nongkrong)
+                                    Kalkulator Split Bill (Hitung Patungan)
                                 </h3>
                                 <p className="text-[11px] opacity-70">
                                     Total Tagihan Struk:{" "}
@@ -558,10 +641,6 @@ export default function OrderStatusAndAi({
                         </div>
                     ) : (
                         <div className="space-y-2 text-xs">
-                            <p className="text-[11px] opacity-75">
-                                Centang menu yang kamu pesan sendiri untuk
-                                menghitung porsi tagihanmu:
-                            </p>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 {order.items?.map((item) => {
                                     const checked = !!selectedMyItems[item.id];
@@ -621,7 +700,7 @@ export default function OrderStatusAndAi({
                     <div className="flex flex-wrap items-center justify-between gap-2">
                         <h3 className="font-black text-sm flex items-center gap-2 text-amber-500">
                             <Star className="w-4 h-4 fill-amber-400" /> Beri
-                            Rating Kopi & Pelayanan Barista Kami
+                            Rating Kopi & Pelayanan Kami
                         </h3>
                         <div className="flex gap-1.5">
                             {[1, 2, 3, 4, 5].map((num) => (
